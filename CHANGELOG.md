@@ -20,7 +20,7 @@ All notable changes to this project are documented here. Format follows
 ### Changed
 
 - One Workflow call per wave (never a single workflow for everything)
-  so the parent narrates between waves; user-visible progress
+  so the parent can narrate between waves; user-visible progress
   contract (plan before launching, per-child role + findings + files
   + `unresolved` plus gate decision after each wave, final report);
   every child `input` starts with "Primero llama a read_skill
@@ -43,6 +43,18 @@ All notable changes to this project are documented here. Format follows
 - New hygiene test `test/hygiene.test.mjs` (registered in `npm test`):
   fails if any `git ls-files` entry contains `/home/<user>` or
   `/Users/<user>`, or if `docs/muse-recon/` exists.
+- The 7 commands now also require `read_skill
+  plugin:oh-my-muse:omm-narration` after `bundled:workflow-authoring`,
+  forbid chaining two Workflow calls without the wave-end card and the
+  next wave header in between, and extend each child schema with
+  `summary` (max 2 lines), `files[]` and `decisions[]` inside the
+  4096-byte limit; each child call carries `label: "w<N>-<rol>"`
+  (verified in a real run: children show as `w1-…` to `w4-…` instead of
+  `generated.model-chosen`).
+- `docs/SMOKE-ORCHESTRATION.md` gains the on-screen visual checklist.
+- `test/orchestration.test.mjs` also asserts the narration contract
+  (skill load + no-chaining rule in all 7 commands, four templates in
+  the skill).
 
 ### Removed
 
@@ -77,18 +89,15 @@ All notable changes to this project are documented here. Format follows
   name (only per-child `label`/`phase`, e.g. `w2-implementer`);
   `log()` visibility unverified, so narration never depends on it.
 
-### Changed (narration)
+### Known issues
 
-- The 7 commands now also require `read_skill
-  plugin:oh-my-muse:omm-narration` after `bundled:workflow-authoring`,
-  forbid chaining two Workflow calls without the wave-end card and the
-  next wave header in between, and extend each child schema with
-  `summary` (max 2 lines), `files[]` and `decisions[]` inside the
-  4096-byte limit; each child call carries `label: "w<N>-<rol>"`.
-- `docs/SMOKE-ORCHESTRATION.md` gains the on-screen visual checklist.
-- `test/orchestration.test.mjs` also asserts the narration contract
-  (skill load + no-chaining rule in all 7 commands, four templates in
-  the skill).
+- The parent does not yet apply the `omm-narration` templates between
+  waves. In a recorded real run of `/omm-team` it loaded the skill,
+  named the children `w<N>-<rol>` and orchestrated four waves with
+  gates, but chained the Workflow calls without the per-wave header and
+  card, and wrote only a prose final report. Instructions alone are not
+  enough; 0.2.2 will enforce the wave card with a `PostToolUse` hook on
+  the Workflow tool.
 
 ## [0.2.0] - 2026-09-24
 
@@ -106,7 +115,9 @@ All notable changes to this project are documented here. Format follows
     `settings.json`).
   - `omm doctor` → kept, now checks node, `muse` in PATH, version, and
     both validators.
-  - `omm notify` → kept, simplified to args + env (no project config).
+  - `omm notify` → kept; configured through
+    `$HOME/.config/oh-my-muse/notify.json` (`omm notify setup`), with
+    `OMM_*` env overrides for CLI use only.
 - Removed: `pack/`, `types/`, `models.json`, `omm.jsonc`, `tsconfig.json`,
   `test/smoke.mjs`, `docs/MODES.md`, `docs/MODEL-COMPATIBILITY.md`,
   `npm run typecheck` / `npm run smoke`, and the `typescript`
@@ -128,7 +139,7 @@ All notable changes to this project are documented here. Format follows
   `security`), 7 commands (`omm-team`, `omm-autopilot`, `omm-ultrawork`,
   `omm-pipeline`, `omm-ultraqa`, `omm-ralph`, `omm-advisor`), and 1 hook
   (`omm-notify-stop` on `Stop`, self-contained `plugin/hooks/notify.mjs`).
-- Notify config file (Fase 5 hotfix, still unreleased): hooks never saw
+- Notify config file: hooks never saw
   `OMM_NOTIFY_CHANNEL` because Muse filters the hook environment, and
   `Stop` fires at the end of every turn. The hook now reads only
   `$HOME/.config/oh-my-muse/notify.json` (via `os.homedir()`; no
