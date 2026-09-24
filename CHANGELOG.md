@@ -37,6 +37,29 @@ All notable changes to this project are documented here. Format follows
 - New static test `test/orchestration.test.mjs` (registered in
   `npm test`) asserting the orchestration contract markers in all 7
   commands.
+- `CONTRIBUTING.md` gains a `Release` section (`v*` tag →
+  `publish.yml` via npm OIDC trusted publishing; never `npm publish`
+  by hand) and no longer uses an absolute checkout path.
+- New hygiene test `test/hygiene.test.mjs` (registered in `npm test`):
+  fails if any `git ls-files` entry contains `/home/<user>` or
+  `/Users/<user>`, or if `docs/muse-recon/` exists.
+
+### Removed
+
+- `docs/muse-recon/` (unpublished maintainer recon of Muse Code 1.3.0:
+  local paths, session IDs, third-party skill text): untracked from
+  git, added to `.gitignore`; its citation in
+  `docs/OPEN-QUESTIONS.md` now reads "evidencia local del mantenedor
+  (recon de Muse Code 1.3.0, no publicada)".
+- `AUDIT_REPORT.md`: 0.1.0 audit, superseded by the 0.2.x validator
+  and test gates.
+- `hooks/notify.mjs`: dead 0.1.x code referenced by nothing (the CLI
+  and the plugin hook both use `plugin/hooks/notify.mjs`).
+- `src/harness/`: referenced by nothing; the live harness contract is
+  `plugin/skills/harness/SKILL.md` plus each command's Gate section
+  (its gate table still named removed agents and tiers).
+- `READY_TO_PUBLISH.md`: folded into the `Release` section of
+  `CONTRIBUTING.md`.
 
 ## [0.2.0] - 2026-09-24
 

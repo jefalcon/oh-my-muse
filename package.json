@@ -34,6 +34,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/cli.test.mjs test/e2e.test.mjs test/validators.test.mjs test/tarball.test.mjs test/notify-config.test.mjs test/orchestration.test.mjs"
+    "test": "node --test test/cli.test.mjs test/e2e.test.mjs test/validators.test.mjs test/tarball.test.mjs test/notify-config.test.mjs test/orchestration.test.mjs test/hygiene.test.mjs"
   }
 }

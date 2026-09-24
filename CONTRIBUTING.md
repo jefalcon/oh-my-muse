@@ -6,7 +6,7 @@ Requires Node.js `>= 20`. No runtime dependencies; TypeScript is the
 only dev dependency (for `npm run typecheck`).
 
 ```sh
-cd /absolute/path/to/oh-my-muse
+cd ~/code/oh-my-muse
 npm install   # dev tooling only (typescript)
 npm run typecheck
 npm test
@@ -48,3 +48,24 @@ npm run typecheck && npm test && node test/smoke.mjs
 - Add or update tests alongside behavior changes.
 - Update `CHANGELOG.md` under a new `Unreleased` section.
 - Ensure `omm doctor` passes against a scratch project.
+
+## Release
+
+Releases go out through `.github/workflows/publish.yml`, which runs on a
+pushed `v*` tag with `id-token: write` (npm OIDC trusted publishing, no
+token to rotate, no `registry-url` override) on Node 24 (npm 11.5.1+).
+It runs `npm ci`, `npm test`, then `npm publish --provenance --access
+public`. Never run `npm publish` by hand.
+
+```sh
+git push origin <branch>   # merge first, then tag, e.g.:
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+Before tagging, check the release locally: every skill validates clean
+(`muse skills validate plugin/skills/* --json`), `muse plugins validate
+plugin --json` is clean, `npm test` is green, `npm pack --dry-run`
+lists `plugin/.muse-plugin/plugin.json` plus all skills, commands,
+hooks and `bin/omm.mjs`, and a fresh `npm install -g oh-my-muse`
+followed by `omm doctor` exits 0.

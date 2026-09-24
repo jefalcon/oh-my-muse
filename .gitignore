@@ -5,6 +5,7 @@ dist/
 # Installed pack copies carry project-local omm.jsonc, which may hold secrets.
 .claude/
 .scratch/
-.scratch/
 *.tgz
 omm-notify.log
+# Maintainer-local recon evidence (session IDs, local paths) is never published.
+docs/muse-recon/

@@ -1,8 +1,9 @@
 # Open Questions (oh-my-muse 0.2.0)
 
 Gaps found while converting to a native Muse Code plugin. Anything not in
-`docs/muse-recon/recon1-3.txt` or the exported MSP schema is treated as
-nonexistent; items below record what was missing and the decision taken.
+the maintainer's local evidence (Muse Code 1.3.0 recon, unpublished) or the
+exported MSP schema is treated as nonexistent; items below record what was
+missing and the decision taken.
 
 ## Decided
 
