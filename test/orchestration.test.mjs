@@ -30,15 +30,50 @@ const MARKERS = [
   "no está disponible",
 ];
 
+// Narration contract (0.2.1, part B): every command must load the
+// narration skill and forbid chaining two Workflows without the
+// wave-end card and the next wave header in between; every child
+// schema carries summary/files/decisions.
+const NARRATION_MARKERS = [
+  "plugin:oh-my-muse:omm-narration",
+  "PROHIBIDO encadenar dos llamadas a Workflow",
+  "summary",
+  "files:string[]",
+  "decisions:string[]",
+  'w<N>-<rol>',
+];
+
+// The four narration templates live in exactly one place.
+const TEMPLATE_MARKERS = [
+  "## 🏮 OMM",
+  "▶ Oleada N/M",
+  "Oleada N/M completada",
+  "**Gate:**",
+  "**Siguiente:**",
+  "## ✅ Hecho",
+  "git diff --stat",
+  "table-fit",
+];
+
 describe("orchestrator commands orchestrate for real", () => {
   for (const name of EXPECTED) {
     it(`${name} carries the full orchestration contract`, () => {
       const file = path.join(COMMANDS_DIR, name);
       assert.ok(fs.existsSync(file), `${name} must exist`);
       const body = fs.readFileSync(file, "utf8");
-      for (const marker of MARKERS) {
+      for (const marker of [...MARKERS, ...NARRATION_MARKERS]) {
         assert.ok(body.includes(marker), `${name} must contain: ${marker}`);
       }
     });
   }
+
+  it("omm-narration holds the four templates and stays non-invocable", () => {
+    const file = path.join(REPO_ROOT, "plugin", "skills", "omm-narration", "SKILL.md");
+    assert.ok(fs.existsSync(file), "omm-narration SKILL.md must exist");
+    const body = fs.readFileSync(file, "utf8");
+    assert.ok(body.includes("user-invocable: false"), "omm-narration must not be user-invocable");
+    for (const marker of TEMPLATE_MARKERS) {
+      assert.ok(body.includes(marker), `omm-narration must contain: ${marker}`);
+    }
+  });
 });

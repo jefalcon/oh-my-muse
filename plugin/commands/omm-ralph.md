@@ -12,6 +12,10 @@ Avanza el trabajo en un bucle de un solo chequeo: $ARGUMENTS
 1. DEBES empezar llamando a `read_skill bundled:workflow-authoring` y
    seguir su perfil Workflow API V1 con el esquema
    `complete/evidence/unresolved`. Sin esta lectura no hay oleadas.
+   Tras esa lectura, OBLIGATORIO: `read_skill
+   plugin:oh-my-muse:omm-narration` y obedecer sus cuatro plantillas
+   (arranque, cabecera de oleada, tarjeta de oleada, cierre) en el
+   idioma del usuario.
 2. DEBES orquestar con la herramienta Workflow. PROHIBIDO implementar,
    investigar o editar en el hilo principal: el hilo principal solo
    anuncia el plan, lanza Workflows, narra entre oleadas e integra el
@@ -24,6 +28,11 @@ Avanza el trabajo en un bucle de un solo chequeo: $ARGUMENTS
    todo). Un Workflow solo devuelve su resultado al terminar y el padre
    no puede narrar mientras se ejecuta; entre oleadas, narra el
    progreso.
+5. PROHIBIDO encadenar dos llamadas a Workflow sin haber escrito antes
+   la tarjeta de fin de oleada (`✔`/`⚠`/`✖` + `**Gate:**` +
+   `**Siguiente:**`) y la cabecera `▶` de la siguiente oleada. La
+   narración va en el hilo principal: el resultado del Workflow es
+   para el padre, el usuario ve la tarjeta.
 
 ## Contrato de progreso (visible para el usuario)
 
@@ -39,10 +48,16 @@ Avanza el trabajo en un bucle de un solo chequeo: $ARGUMENTS
 
 - El `input` de cada hijo DEBE empezar con "Primero llama a read_skill plugin:oh-my-muse:<rol>." (sustituye `<rol>` por el rol de ese hijo:
   `planner`, `implementer`, `tester`, `reviewer`, `debugger`) y pedir
-  el esquema `complete/evidence/unresolved`
-  (`complete:boolean`, `evidence:string[]`, `unresolved:string[]`).
+  el esquema
+  `complete/evidence/unresolved/summary/files/decisions`
+  (`complete:boolean`, `evidence:string[]`, `unresolved:string[]`,
+  `summary:string` — máx. 2 líneas, `files:string[]`,
+  `decisions:string[]`).
 - Cada `input` completo DEBE respetar el límite de 4096 bytes UTF-8
-  (texto + refs + contexto compacto juntos).
+  (texto + refs + contexto compacto + `summary`/`files`/`decisions`
+  juntos).
+- Cada llamada de hijo lleva `label: "w<N>-<rol>"` (p. ej.
+  `w2-implementer`).
 
 ## Setup
 

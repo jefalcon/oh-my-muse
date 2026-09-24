@@ -61,6 +61,35 @@ All notable changes to this project are documented here. Format follows
 - `READY_TO_PUBLISH.md`: folded into the `Release` section of
   `CONTRIBUTING.md`.
 
+### Added
+
+- New non-invocable skill `plugin/skills/omm-narration/SKILL.md`: the
+  single source of the narration templates in the user's language
+  (start card `## 🏮 OMM …` with plan table after loading
+  `bundled:table-fit`, per-wave `### ▶ …` header with roster, per-wave
+  `✔`/`⚠`/`✖` card with `**Gate:**`/`**Siguiente:**`, closing
+  `## ✅ Hecho` with real `git diff --stat`, literal test output,
+  pending items and next step). Fixed sober icons (🏮 ▶ ✔ ⚠ ✖ ✅);
+  no JSON in the narration: the Workflow result is for the parent,
+  the user sees the card.
+- `docs/OPEN-QUESTIONS.md` D4/O5: B1 findings from regenerating
+  `muse schema generate-ts` on 1.3.0 — no model-settable per-workflow
+  name (only per-child `label`/`phase`, e.g. `w2-implementer`);
+  `log()` visibility unverified, so narration never depends on it.
+
+### Changed (narration)
+
+- The 7 commands now also require `read_skill
+  plugin:oh-my-muse:omm-narration` after `bundled:workflow-authoring`,
+  forbid chaining two Workflow calls without the wave-end card and the
+  next wave header in between, and extend each child schema with
+  `summary` (max 2 lines), `files[]` and `decisions[]` inside the
+  4096-byte limit; each child call carries `label: "w<N>-<rol>"`.
+- `docs/SMOKE-ORCHESTRATION.md` gains the on-screen visual checklist.
+- `test/orchestration.test.mjs` also asserts the narration contract
+  (skill load + no-chaining rule in all 7 commands, four templates in
+  the skill).
+
 ## [0.2.0] - 2026-09-24
 
 ### **BREAKING**

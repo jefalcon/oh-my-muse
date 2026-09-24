@@ -50,3 +50,25 @@ muestra; también aparece en el payload `session_id` del hook).
   disponible en esa sesión (`workflow_tool: true`).
 - Subagentes sin `read_skill` de rol: el `input` no llevó el prefijo
   obligatorio. Revisa la sección "Forma de cada `input`" del command.
+
+## 5. Checklist visual (lo que debes ver en pantalla)
+
+Las plantillas viven en `plugin/skills/omm-narration/SKILL.md`. Marca
+cada punto mientras se ejecuta; si falta uno, la narración falló
+aunque el trabajo saliera bien.
+
+- [ ] **Arranque**: una tarjeta `## 🏮 OMM <comando> · <objetivo>` con
+  una frase de enfoque y una tabla de plan (Oleada | Roles | Paralelo
+  | Gate) ANTES del primer Workflow.
+- [ ] **Antes de cada oleada**: cabecera `### ▶ Oleada N/M · <nombre>`
+  con una línea del porqué y el roster (`• <rol> → <encargo>`).
+- [ ] **Tras cada oleada**: tarjeta `### ✔` (o `⚠` / `✖`) con tabla
+  Rol | Resultado | Archivos | Pendiente, más las líneas `**Gate:**`
+  y `**Siguiente:**`. PROHIBIDO ver dos Workflows seguidos sin esta
+  tarjeta y la cabecera `▶` siguiente en medio.
+- [ ] **Cierre**: tarjeta `## ✅ Hecho` con tabla de oleadas, un
+  `git diff --stat` real, el resultado literal de los tests,
+  pendientes y siguiente paso sugerido.
+- [ ] **Nunca en pantalla**: JSON en bruto de resultados de Workflow,
+  ni workflows llamados `generated.*` como única identificación (los
+  hijos llevan `label: "w<N>-<rol>"`, p. ej. `w2-implementer`).

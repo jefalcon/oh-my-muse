@@ -61,7 +61,36 @@ Fase 5 update: with only one hook left there is no sharing anymore, so
 `omm-notify-stop` points directly at `hooks/notify.mjs` and both
 wrappers are deleted.
 
+## Decided (0.2.1)
+
+### D4 — Readable workflow names: per-child only (decided 2026-09-24)
+
+Regenerated `muse schema generate-ts --out .scratch/msp` on Muse Code
+1.3.0: `MspMethod` still carries only `workflow/cancel` and
+`workflow/childControl` (no launch entry — confirms D1), and a
+`workflow` transcript item carries only runtime-assigned opaque
+identity (`entryId`, `scriptId`, `workflowRunId`, `triggerSource`
+e.g. `"modelProposal"`). There is NO model-settable run name/title
+field: names like `generated.model-chosen` are runtime-generated.
+The only readable knob with a durable surface is per child:
+`WorkflowChild` folds optional `label` and `phase` ("when recorded"),
+so a child call may carry `label` / `phase("…")` (e.g. `w2-implementer`).
+Whether the TUI renders them was not verifiable from this session —
+the guaranteed-visible narration is the parent's cards (skill
+`omm-narration`), never the run name.
+
 ## Open
+
+### O5 — Is `log()` visible in the TUI or /workflows? (unverified)
+
+`bundled:workflow-authoring` documents the bare global `log("message")`
+(progress markers, max 512 chars) and `phase("title")` (max 128 chars),
+but neither the skill nor the MSP schema (no log-message field on any
+item or view) says where — if anywhere — that output renders. It could
+not be observed from this session. Consequence: children MAY emit
+`[<rol>] <acción>` log lines at milestones, but the narration contract
+never depends on them being seen; the parent's wave cards are the
+surface the user is guaranteed to see.
 
 ### O1 — Hook stdin payload shape (Fase 5: verified on this machine)
 
