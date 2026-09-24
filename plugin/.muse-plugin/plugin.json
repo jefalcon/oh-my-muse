@@ -29,7 +29,15 @@
       { "id": "tester", "path": "skills/tester/SKILL.md", "enabledDefault": true },
       { "id": "verify", "path": "skills/verify/SKILL.md", "enabledDefault": true }
     ],
-    "commands": [],
+    "commands": [
+      { "id": "omm-advisor", "path": "commands/omm-advisor.md", "enabledDefault": true },
+      { "id": "omm-autopilot", "path": "commands/omm-autopilot.md", "enabledDefault": true },
+      { "id": "omm-pipeline", "path": "commands/omm-pipeline.md", "enabledDefault": true },
+      { "id": "omm-ralph", "path": "commands/omm-ralph.md", "enabledDefault": true },
+      { "id": "omm-team", "path": "commands/omm-team.md", "enabledDefault": true },
+      { "id": "omm-ultraqa", "path": "commands/omm-ultraqa.md", "enabledDefault": true },
+      { "id": "omm-ultrawork", "path": "commands/omm-ultrawork.md", "enabledDefault": true }
+    ],
     "hooks": [],
     "mcpServers": [],
     "reminders": []
