@@ -4,3 +4,7 @@ dist/
 .DS_Store
 # Installed pack copies carry project-local omm.jsonc, which may hold secrets.
 .claude/
+.scratch/
+.scratch/
+*.tgz
+omm-notify.log

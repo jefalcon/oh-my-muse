@@ -1,0 +1,871 @@
+
+===== version
+Muse Code 1.3.0 (1.3.0-R3401.1)
+
+===== help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+          not save trust
+      --disable-approval
+          Disable tool approval prompts for this workspace run
+      --disable-sandbox
+          Disable shell filesystem/network sandboxing for this run
+      --sandbox-network <MODE>
+          Sandbox network mode: restricted|enabled|proxy-only (default:
+          proxy-only)
+      --disable-write
+          Disable non-shell workspace filesystem writes
+      --disable-shell
+          Disable workspace shell execution
+      --enable-shell-tool
+          Use the legacy shell tool instead of the managed platform shell
+
+Run `muse <command> --help` for command-specific options.
+
+
+===== muse config --help
+Usage: muse config validate --plane <defaults|policy> --file <path>
+       muse config status
+
+validate checks an enterprise plane document ({"schema_version":1,"settings":{...}} for defaults), not the user's flat settings.json; unknown top-level settings.json members are named at startup instead.
+
+===== muse skills --help
+usage: muse skills list [--source all|user|project|built-in|plugin] [--enabled-only] [--workspace <path>] [--trust-workspace] [--json]
+
+usage: muse skills inspect <skill-id-or-path> [--source all|user|project|built-in|plugin] [--workspace <path>] [--trust-workspace] [--json]
+
+usage: muse skills enable <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+
+usage: muse skills user-only <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+
+usage: muse skills disable <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+
+usage: muse skills validate <path> [--json]
+
+usage: muse skills install <path> [--scope user] [--name NAME] [--force] [--json]
+
+usage: muse skills import --from claude|codex [--scope user] [--dry-run] [--force] [--json]
+
+usage: muse skills update <skill-id> [--json]
+
+usage: muse skills uninstall <skill-id> [--keep-files] [--json]
+
+===== muse agents --help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+
+===== muse agent --help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+
+===== muse subagents --help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+
+===== muse hooks --help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+
+===== muse exec --help
+muse exec — run one prompt non-interactively (headless)
+
+Usage: muse exec [OPTIONS] [PROMPT]
+
+Options:
+      --json
+          Emit machine-readable JSONL events on stdout
+      --prompt-file <PATH>
+          Read the prompt from a file instead of an argument
+      --api-key-stdin
+          Read the provider API key from stdin
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --model <ID>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --base-url <URL>
+          Override the provider base URL
+      --image <PATH>
+          Attach a local image file (repeatable)
+      --workspace <PATH>
+          Root policy-gated workspace tools at PATH
+  -w, --worktree [<MODE>]
+          Session git worktree: off|create|existing
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --context-compaction-strategy <ID>
+          Context compaction strategy: summary-preserved-suffix/v1,
+          prefix-extension-summary/v1, prefix-extension-inventory-summary/v1
+      --context-compaction-soft-threshold <FRAC>
+          Soft compaction threshold
+      --context-compaction-hard-threshold <FRAC>
+          Hard compaction threshold
+      --output-schema <FILE>
+          Shape the final answer with the JSON schema in FILE (meta provider
+          only)
+      --max-model-steps <N>
+          Cap the number of model steps
+      --max-tool-output-bytes <N>
+          Cap tool output bytes fed back to the model (0 or >=9)
+      --session-id <UUID>
+          Use a specific session id
+      --allow-workspace-switch
+          Allow switching the workspace mid-run
+      --user-input-auto-resolve
+          Offer request_user_input and auto-cancel prompts (headless)
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --disable-web-tools
+          Disable web tools for this run
+      --no-foreign-personal-context
+          Exclude foreign personal rules and skills from this run
+      --no-session-log
+          Do not persist session event logs to disk
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+  -h, --help
+          Print this help
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandbox and trust this workspace (this run)
+      --trust-workspace
+
+===== muse serve --help
+muse serve — serve an MSP session host over stdio
+
+Usage: muse serve [OPTIONS]
+
+The client owns this process's stdin and stdout and is its only
+connection. Sandbox posture and session durability are constructed
+here and apply to every session the host loads; neither is negotiable
+over the wire. Approval mode is the other way round — it is selected
+on the wire, so there is no approval flag here.
+
+Options:
+  -h, --help
+          Print this help
+      --no-session-log
+          Use memory-only sessions
+
+Sandbox posture (fixed for the host's lifetime):
+      --disable-sandbox
+          Disable shell filesystem/network sandboxing for this host
+      --sandbox-network <MODE>
+          Sandbox network mode (default: proxy-only)
+      --disable-write
+          Disable non-shell workspace filesystem writes
+      --disable-shell
+          Disable workspace shell execution
+      --trust-workspace
+          Load each session workspace's skills and rules
+
+
+===== muse mcp --help
+muse mcp — log in to or out of an MCP server (OAuth)
+
+Usage: muse mcp login <server> [--oauth-client-id <CLIENT_ID>] [--scope <SCOPE>]...
+                      [--headless] [--callback-port <PORT>]
+       muse mcp logout <server>
+
+<server> is a streamable-HTTP entry under mcpServers in settings.json.
+Run `muse mcp login --help` or `muse mcp logout --help` for details.
+
+
+===== muse memory --help
+muse — interactive terminal coding agent
+
+If no subcommand is given, options run the interactive TUI; pass a prompt to start
+a session, or use a command below.
+
+Usage: muse [OPTIONS] [PROMPT]
+       muse [OPTIONS] <COMMAND>
+
+Commands:
+  resume           Resume a previous session (--last or <session-ref>)
+  exec             Run one prompt non-interactively (headless)
+  config           Validate enterprise configuration documents
+  export           Export a session transcript to a file
+  trace            Inspect a recorded session or run trace
+  skills           List, inspect, enable, or disable skills
+  plugins          Validate and manage plugin bundles
+  sandbox          Check or set up the OS sandbox
+  schema           Export the MSP wire schema (JSON Schema or TypeScript)
+  serve            Serve an MSP session host over stdio
+  session-message  List or send cross-session messages
+  mcp              Log in to or out of an MCP server (OAuth)
+  auth             Store provider API credentials
+  login            Log in to a provider
+  logout           Remove stored provider credentials
+  init             Scaffold agent config in this workspace
+
+Options:
+  -h, --help
+          Print help
+  -V, --version
+          Print version
+      --agents <JSON>
+          Supply one ephemeral agent-definition overlay
+      --provider <MODE>
+          Startup provider: echo or meta (default: meta)
+      --preset <NAME>
+          Run a built-in preset: native-basic, miniswe
+      --model <MODEL>
+          Model id for non-echo providers
+      --reasoning-effort <EFFORT>
+          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra
+          (default: high)
+      --base-url <URL>
+          Override the Meta provider base URL
+      --image <PATH>
+          Attach a local image file to the next submitted prompt
+      --workspace <PATH>
+          Register policy-gated workspace tools rooted at PATH
+  -w, --worktree [<MODE>]
+          Session Git worktree: off|create|existing; a bare -w means create
+          (default: off)
+      --worktree-base <REF>
+          Base ref for --worktree create (default: HEAD)
+      --worktree-existing <PATH>
+          Existing worktree path for --worktree existing
+      --parallel-tool-calls
+          Enable Meta API parallel tool calls
+      --no-parallel-tool-calls
+          Disable Meta API parallel tool calls
+      --subagent-worktree-isolation
+          Compatibility flag; capability defaults on. Only an affirmative
+          per-child request asks for isolation; omission stays shared. Requests
+          may reject when capability, provider, or Git prerequisites are
+          unavailable.
+      --approval-mode <MODE>
+          Tool approval mode: untrusted|on-request|never (default: on-request)
+      --permission-profile <ID>
+          Select a named permission profile for this session.
+      --approval-judge <off|on>
+          LLM approval judge for Prompt-bound calls (default: on)
+      --no-session-log
+          Do not persist session event logs to disk
+      --echo-delay-ms <MS>
+          Deterministic echo reply delay (echo provider only)
+
+Safety (approval and the sandbox are ON by default):
+      --yolo
+          Disable approval and sandboxing and trust this workspace for this run
+      --trust-workspace
+          Trust this workspace for this run (load its skills and rules); does
+
+===== muse export --help
+usage: muse export [--session <id|path>] [--last] [--out <file>] [--redacted]
+
+Exports one session's durable log as a single self-contained JSON document
+(export_schema_version 1): timestamps, messages, verbatim encrypted
+reasoning, tool calls/results, approvals, question outcomes, model ids,
+ses_/trajectory_ ids, and fork/subagent lineage.
+
+Without --out, the document is written to trajectory-<timestamp>.json in
+the current directory (falling back to the temp dir when the cwd is not
+writable; an existing file is never overwritten — the name is uniquified)
+and stdout carries exactly one line: the absolute path written.
+
+With no --session on an interactive terminal, export opens the SAME session
+picker `muse resume` uses so you can see and choose which session to export
+(#10408) — unless --out is given (a file destination exports the most
+recent session, never the picker). A piped/redirected export stays
+non-interactive and exports the most recent session; pass --last to be
+explicit or to skip the picker interactively.
+
+Options:
+  --session <id|path>  Session UUID (resolved in the local session store) or
+                       a path to a session.jsonl file. An existing file path
+                       wins over an id parse. Bypasses the picker.
+  --last               Skip the picker and export the most recent retained
+                       session for the current workspace. Also the default
+                       when the terminal is non-interactive.
+  --out <file>         Write the document to <file> instead of the default
+                       timestamped file. An existing file is replaced on
+                       success (staged + renamed, so a failed export leaves
+                       the previous file intact). Like --last, this
+                       skips the picker (most recent session).
+  --redacted           Share-safe variant: payload strings pass through the
+                       telemetry redaction rules. Default output is RAW —
+                       the export is a local file you already own. Encrypted
+                       reasoning blobs stay verbatim in both modes.
+
+Offline: reads only local files; no network access. Schema and details:
+docs/session-export.md
+
+===== binario
+/home/javi/.local/bin/muse
+/home/javi/.local/bin/muse: Bourne-Again shell script, ASCII text executable
+
+===== dirs de config (usuario)
+/home/javi/.config/muse
+/home/javi/.config/muse/trust.json
+/home/javi/.config/muse/.auth.json.lock
+/home/javi/.config/muse/auth.json
+/home/javi/.config/muse/.settings.json.lock
+/home/javi/.config/muse/settings.json
+/home/javi/.config/muse/.trust.json.lock
+/home/javi/.local/share/muse
+/home/javi/.local/share/muse/model-catalog
+/home/javi/.local/share/muse/model-catalog/6d657461__p746268.json
+/home/javi/.local/share/muse/memory
+/home/javi/.local/share/muse/memory/personal
+/home/javi/.local/share/muse/memory/personal/.muse-memory.lock
+/home/javi/.local/share/muse/memory/personal/MEMORY.md
+/home/javi/.local/share/muse/session-index.db
+/home/javi/.local/share/muse/local-tracing
+/home/javi/.local/share/muse/local-tracing/bootstrap
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-c68f599f-e4e9-4a0b-9281-9751ec1977d5.log.3
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-f06d122f-6ce8-4108-8d13-18b330f8f5d4.log.1
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-830a1843-afd6-4df7-b590-70b750507486.log.1
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-400752e8-d307-4c9d-a103-311c92305ef3.log.1
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-c68f599f-e4e9-4a0b-9281-9751ec1977d5.log.1
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-c68f599f-e4e9-4a0b-9281-9751ec1977d5.log.4
+/home/javi/.local/share/muse/local-tracing/bootstrap/cli-c68f599f-e4e9-4a0b-9281-9751ec1977d5.log.2
+/home/javi/.local/share/muse/plugins
+/home/javi/.local/share/muse/plugins/cache
+/home/javi/.local/share/muse/plugins/cache/builtin
+/home/javi/.local/share/muse/skills
+/home/javi/.local/share/muse/skills/bundled
+/home/javi/.local/share/muse/skills/bundled/muse-core
+/home/javi/.local/share/muse/feature-config
+/home/javi/.local/share/muse/feature-config/7075626c6963.json
+/home/javi/.local/share/muse/tui-history.jsonl
+/home/javi/.local/share/muse/runtime
+/home/javi/.local/share/muse/runtime/muse
+/home/javi/.local/share/muse/runtime/muse/ms-1d6343e8c966.sock
+/home/javi/.local/share/muse/runtime/muse/ms-981df321adb3.sock.lease
+/home/javi/.local/share/muse/runtime/muse/ms-a4535f7a855f.sock
+/home/javi/.local/share/muse/runtime/muse/ms-a4535f7a855f.sock.lease
+/home/javi/.local/share/muse/runtime/muse/ms-981df321adb3.sock
+/home/javi/.local/share/muse/runtime/muse/ms-0eb3c1f01f80.sock
+/home/javi/.local/share/muse/runtime/muse/ms-1d6343e8c966.sock.lease
+/home/javi/.local/share/muse/runtime/muse/ms-0eb3c1f01f80.sock.lease
+/home/javi/.local/share/muse/runtime/muse/sessions
+/home/javi/.local/share/muse/runtime/muse/.session-registry.mutation.lock
+/home/javi/.local/share/muse/tui-history.jsonl.lock
+/home/javi/.local/share/muse/sessions
+
+===== settings.json (redactado)
+{
+  "schema_version": 1,
+  "provider": "meta",
+  "model": "muse-spark-1.3-contributor"
+}
+===== dirs del proyecto
+
+===== SKILL.md en disco
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/durable-test-collateral/84ba3156de5ee8da3d91e3a69d5254c7d4935b1310233d574fc2934eedeb9f1c/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/manage-settings/4381b5a6a9952330ed38b876065e430e2c9e6f0a5fa5b1628114d48060e7c09a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/workflow-authoring/78651f6f5d063db46fcfda1862603c270b106844ba7d6c44cc2d4b0d1d26009f/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/taste/30f6f6230cf99c3309d99a173a46c1bcb08dcddfa054879cd5d87ac55b74d82b/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/slack-connector/775915c386ad606fd30375ab2a63324d390f1c131b15094624b30ba36f150941/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/doctor/362cd5a3ba336467544eb41e85d4921536b2d83a10cb0eab82c495a829d10b77/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/import/5bc46b7edb9f5b6d9a26e3bf71e668387660caf54a3d239c480ab954a3da1d1b/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/grill/7256b68b9e473949716a1c327243a0e1f5cee454fd12395d7b6597067c493489/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/requirements-clarification/4dc3805a608809f0ffc206a8ae1ac6ebfd9236f5e8e65f0115e8c15b3c56488f/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/greenfield-project-scaffolding/22d11c18a4ffa76a908252352cf4456940b73c02b07878e2c9dc2152a0f352c7/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/resume-codex/30ddd55a24fd21ba171e36c74773673e0aca54f68eb4f00afc3d08239db27be3/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/resume-claude/9df9d8756818f62e9702b0f4005cee99929536dea6fa6563b2fa80af1b9cd54d/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/browser-app-delivery/14694efcee02f355f96e17c4adb0173119ee139bb5a2bdca95920e86b7bbe424/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/daemon/59e6cedb7e8a01ed3d9e3d6e79c629c4a229351eb45c87f437bed22bd82cb886/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/create-skill/b64c39beef180769f8e78c7462ba44ccff71c8525e8f08c5ac07cda56721047a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/read-session/0782fa625e566a3ee1243ee37e7fa4cfecf78aec3e4280b28b2c4fc4388709e6/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/create-plugin/129ca673378e9316f5bbaaee6dc93a8c995ce4fdec620b5f44971a0cded2694c/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/git/0eda03ddc26ba23b41e43e53340623aead7326b4e1f096b34e3d667919c649eb/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/migrate/1dda33263863de8c8c9ba0a170951f9ae3b7633ad3d8164542251a565d014a4a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/host-manager/407f5bd83299f0b718e0ddabe1c4365891e00f7e06f80d8dbb056df686790511/SKILL.md
+
+===== ejemplo: /home/javi/.local/share/muse/plugins/cache/builtin/muse-core/durable-test-collateral/84ba3156de5ee8da3d91e3a69d5254c7d4935b1310233d574fc2934eedeb9f1c/SKILL.md
+---
+name: durable-test-collateral
+description: Load the body before the first implementation edit for a bug fix or behavior change, or when the user or governing specification makes reusable tests a deliverable. It keeps the smallest focused test with the delivered project and updates coverage when behavior changes. Do not load for greenfield work unless reusable tests are explicitly required, behavior-preserving refactors, verification-only work, plan/review/explanation/documentation/formatting/generated-output-only work, explicit no-change or no-tool work, or when the user declines tests.
+user-invocable: false
+---
+
+# Durable Test Collateral
+
+Verification is part of the delivered project when it can prevent the same
+behavior from breaking again. Use the project's existing framework and
+conventions.
+
+## Keep the check with the project
+
+For a bug fix or behavior change, add or update the smallest maintained test in
+the repository's normal test layout that exercises the changed behavior. If a
+specification makes a reusable suite or test category a deliverable, implement
+that suite instead of treating it as private verification.
+
+An inline interpreter command, heredoc, scratch script, temporary-directory
+test, demo, or manual probe may help diagnose the problem, but it does not
+replace the maintained test. Keep a useful self-authored test unless the user
+explicitly asks for a disposable probe.
+
+Do not add a new test framework solely to satisfy this skill. If the repository
+has no maintained harness and the request does not require one, disclose when
+durable coverage would be disproportionate or infeasible and use the narrowest
+honest verification instead.
+
+On a later turn, update the maintained test even when the old suite remains
+green and the user does not repeat the test request. Cover the new behavior,
+not merely an unrelated cleanup in the test file.
+
+## Prove the maintained check
+
+Observe the authentic failure before the implementation change when it is safe
+and runnable. Then make the smallest implementation change and run the focused
+maintained test after the final relevant source or test edit.
+
+Do not weaken or delete a real failing test to obtain green. Fix the product,
+
+===== docs del paquete que mencionan agentes
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/manage-settings/4381b5a6a9952330ed38b876065e430e2c9e6f0a5fa5b1628114d48060e7c09a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/slack-connector/775915c386ad606fd30375ab2a63324d390f1c131b15094624b30ba36f150941/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/resume-claude/9df9d8756818f62e9702b0f4005cee99929536dea6fa6563b2fa80af1b9cd54d/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/daemon/59e6cedb7e8a01ed3d9e3d6e79c629c4a229351eb45c87f437bed22bd82cb886/references/recovery.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/daemon/59e6cedb7e8a01ed3d9e3d6e79c629c4a229351eb45c87f437bed22bd82cb886/references/progress-and-replies.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/daemon/59e6cedb7e8a01ed3d9e3d6e79c629c4a229351eb45c87f437bed22bd82cb886/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/create-skill/b64c39beef180769f8e78c7462ba44ccff71c8525e8f08c5ac07cda56721047a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/read-session/0782fa625e566a3ee1243ee37e7fa4cfecf78aec3e4280b28b2c4fc4388709e6/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/migrate/1dda33263863de8c8c9ba0a170951f9ae3b7633ad3d8164542251a565d014a4a/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/host-manager/407f5bd83299f0b718e0ddabe1c4365891e00f7e06f80d8dbb056df686790511/SKILL.md
+/home/javi/.local/share/muse/plugins/cache/builtin/muse-core/plan/8dbfb76318682bed3c31cc1964214ee7d2d9f025d215e8ff09b72aa23225f03b/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/manage-settings/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/slack-connector/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/resume-claude/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/daemon/references/recovery.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/daemon/references/progress-and-replies.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/daemon/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/create-skill/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/read-session/SKILL.md
+/home/javi/.local/share/muse/skills/bundled/muse-core/skills/migrate/SKILL.md
+
+hecho -> muse-recon.txt
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m qqqq^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m ^C[?2004l[?2004h[?2004l
+[?2004h(base) ]0;javi@javi-linux: ~/code/orq/oh-my-muse[1;35mjavi[0m@[1;36mjavi-linux[0m:[1;32m~/code/orq/oh-my-muse[0m
+[1;32m$[0m [?2004l[?2004h[?2004l
