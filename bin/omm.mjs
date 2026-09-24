@@ -9,6 +9,7 @@ import {
   museVersion,
   validatePlugin,
   installArgs,
+  notifySetupHelp,
   redactText,
 } from "./lib.mjs";
 import fs from "node:fs";
@@ -147,6 +148,10 @@ function truthyFlag(value) {
 }
 
 async function cmdNotifySetup(args) {
+  if (args.help !== undefined) {
+    console.log(notifySetupHelp());
+    return;
+  }
   const channel = String(args.channel ?? args._[1] ?? "");
   if (!CHANNELS.includes(channel)) fail(`Usage: omm notify setup --channel ${CHANNELS.join("|")} [options]`);
   const config = { channel };

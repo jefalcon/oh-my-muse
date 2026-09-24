@@ -237,3 +237,103 @@ export function installArgs(pluginDir, scope) {
   }
   return ["plugins", "install", pluginDir, ...(scope ? ["--scope", scope] : [])];
 }
+
+/**
+ * Single source of truth for `omm notify setup` options. `channels` names
+ * every channel the option applies to; `secret` marks credential values
+ * that are stored but never printed. `cmdNotifySetup` in bin/omm.mjs must
+ * read exactly these flags (plus the positional channel).
+ */
+export const NOTIFY_SETUP_OPTIONS = [
+  {
+    name: "channel",
+    aliases: [],
+    value: "<telegram|discord|slack|file|off>",
+    desc: "Notification channel to configure (also accepted as a positional argument).",
+    channels: ["telegram", "discord", "slack", "file", "off"],
+    required: true,
+    secret: false,
+  },
+  {
+    name: "message",
+    aliases: ["text"],
+    value: "<text>",
+    desc: "Default message template (supports {{projectName}} {{event}} {{date}} and $ENV).",
+    channels: ["telegram", "discord", "slack", "file"],
+    required: false,
+    secret: false,
+  },
+  {
+    name: "webhookUrl",
+    aliases: ["webhook-url", "url"],
+    value: "<url>",
+    desc: "Webhook URL (https + provider host allowlist enforced).",
+    channels: ["discord", "slack"],
+    required: false,
+    secret: true,
+  },
+  {
+    name: "botToken",
+    aliases: ["bot-token"],
+    value: "<token>",
+    desc: "Telegram bot token.",
+    channels: ["telegram"],
+    required: false,
+    secret: true,
+  },
+  {
+    name: "chatId",
+    aliases: ["chat-id"],
+    value: "<id>",
+    desc: "Telegram chat id.",
+    channels: ["telegram"],
+    required: false,
+    secret: false,
+  },
+  {
+    name: "file",
+    aliases: [],
+    value: "<path>",
+    desc: "Log file for the file channel (confined to the session cwd unless allowed externally).",
+    channels: ["file"],
+    required: false,
+    secret: false,
+  },
+  {
+    name: "allowExternalFile",
+    aliases: ["allow-external-file"],
+    value: "<true|false>",
+    desc: "Allow the file channel outside the session cwd.",
+    channels: ["file"],
+    required: false,
+    secret: false,
+  },
+  {
+    name: "includeAssistantMessage",
+    aliases: ["include-assistant-message", "includeAssistant"],
+    value: "<true|false>",
+    desc: "Append the last assistant message to the notification.",
+    channels: ["telegram", "discord", "slack", "file"],
+    required: false,
+    secret: false,
+  },
+];
+
+export function notifySetupHelp() {
+  const lines = [
+    "Usage: omm notify setup (--channel <c> | <c>) [options]",
+    "",
+    "Writes $HOME/.config/oh-my-muse/notify.json (mode 0600). Secrets are",
+    "stored only there and never printed.",
+    "",
+    "Options (one per line):",
+  ];
+  for (const opt of NOTIFY_SETUP_OPTIONS) {
+    const flags = [`--${opt.name}`, ...opt.aliases.map((a) => `--${a}`)].join(", ");
+    const req = opt.required ? " (required)" : "";
+    const sec = opt.secret ? " [secret]" : "";
+    lines.push(`  ${flags} ${opt.value}${req}${sec}`);
+    lines.push(`      ${opt.desc} Applies to: ${opt.channels.join(", ")}.`);
+  }
+  return lines.join("\n");
+}

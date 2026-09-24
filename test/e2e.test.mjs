@@ -74,6 +74,31 @@ describe("CLI surface", () => {
     }
   });
 
+  it("notify setup --help documents every option the setup parser accepts", async () => {
+    const { NOTIFY_SETUP_OPTIONS } = await import("../bin/lib.mjs");
+    assert.ok(NOTIFY_SETUP_OPTIONS.length > 0, "option table must not be empty");
+    const out = runCli(["notify", "setup", "--help"], makeTmp());
+    const allLines = out.split("\n");
+    const optStart = allLines.findIndex((l) => l.startsWith("Options"));
+    assert.notEqual(optStart, -1, "help must have an Options section");
+    const lines = allLines.slice(optStart);
+    const lineFor = (flag) => {
+      const i = lines.findIndex((l) => new RegExp(`--${flag}(?![-\\w])`).test(l));
+      if (i === -1) return undefined;
+      return `${lines[i]}\n${lines[i + 1] ?? ""}`;
+    };
+    for (const opt of NOTIFY_SETUP_OPTIONS) {
+      for (const flag of [opt.name, ...opt.aliases]) {
+        const line = lineFor(flag);
+        assert.ok(line, `help must document --${flag}`);
+        for (const ch of opt.channels) {
+          assert.ok(line.includes(ch), `--${flag} line must say it applies to ${ch}`);
+        }
+        assert.equal(line.includes("[secret]"), opt.secret === true, `--${flag} secret marking`);
+      }
+    }
+  });
+
   it("unknown command fails with a clear error", () => {
     const res = runCliFail(["frobnicate"], makeTmp());
     assert.notEqual(res.status, 0);
