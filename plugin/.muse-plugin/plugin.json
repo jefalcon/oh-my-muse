@@ -38,7 +38,10 @@
       { "id": "omm-ultraqa", "path": "commands/omm-ultraqa.md", "enabledDefault": true },
       { "id": "omm-ultrawork", "path": "commands/omm-ultrawork.md", "enabledDefault": true }
     ],
-    "hooks": [],
+    "hooks": [
+      { "id": "omm-notify-stop", "event": "Stop", "command": ["node", "hooks/notify-stop.mjs"], "timeoutMs": 15000, "statusMessage": "Sending turn-end notification" },
+      { "id": "omm-notify-end", "event": "SessionEnd", "command": ["node", "hooks/notify-end.mjs"], "timeoutMs": 15000, "statusMessage": "Sending session-end notification" }
+    ],
     "mcpServers": [],
     "reminders": []
   }

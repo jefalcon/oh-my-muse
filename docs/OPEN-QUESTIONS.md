@@ -44,12 +44,11 @@ argv entry pointing at the same file — see D3).
 ### D3 — Hook source sharing (Fase 3, decided 2026-09-24)
 
 The contract states hook source paths cannot be shared by two hook IDs.
-`omm-notify-stop` and `omm-notify-end` both execute
-`["node", "hooks/notify.mjs"]` with different behavior selected from the
-hook payload's event name at runtime, so a single argv path is referenced
-twice. If the validator rejects the shared path, the fallback is to split
-into `hooks/notify-stop.mjs` + `hooks/notify-end.mjs` (thin wrappers).
-Kept as one file unless validation says otherwise.
+`omm-notify-stop` and `omm-notify-end` needed the same logic, but the
+validator rejects a shared argv source (`duplicate-hook-source`, observed
+2026-09-24). Applied the fallback: `hooks/notify.mjs` holds all shared
+logic (exported `runHook`), and thin wrappers `hooks/notify-stop.mjs` /
+`hooks/notify-end.mjs` reference one argv path each. Validation is clean.
 
 ## Open
 
