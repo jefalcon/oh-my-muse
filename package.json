@@ -1,6 +1,6 @@
 {
   "name": "oh-my-muse",
-  "version": "0.1.1-dev",
+  "version": "0.1.1",
   "description": "Token-efficient agent pack runner for Muse Spark",
   "keywords": [
     "muse",
