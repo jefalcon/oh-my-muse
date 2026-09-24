@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "name": "oh-my-muse",
+  "displayName": "Oh My Muse",
+  "version": "0.2.0",
+  "description": "Specialist skills and orchestrator commands for Muse Code, with turn-end notifications.",
+  "compat": {
+    "source": "native",
+    "manifestDir": ".muse-plugin"
+  },
+  "capabilities": {
+    "skills": [
+      { "id": "architect", "path": "skills/architect/SKILL.md", "enabledDefault": true },
+      { "id": "critic", "path": "skills/critic/SKILL.md", "enabledDefault": true },
+      { "id": "data-scientist", "path": "skills/data-scientist/SKILL.md", "enabledDefault": true },
+      { "id": "debugger", "path": "skills/debugger/SKILL.md", "enabledDefault": true },
+      { "id": "designer", "path": "skills/designer/SKILL.md", "enabledDefault": true },
+      { "id": "docs", "path": "skills/docs/SKILL.md", "enabledDefault": true },
+      { "id": "docs-writer", "path": "skills/docs-writer/SKILL.md", "enabledDefault": true },
+      { "id": "file-picker", "path": "skills/file-picker/SKILL.md", "enabledDefault": true },
+      { "id": "harness", "path": "skills/harness/SKILL.md", "enabledDefault": true },
+      { "id": "implementer", "path": "skills/implementer/SKILL.md", "enabledDefault": true },
+      { "id": "planner", "path": "skills/planner/SKILL.md", "enabledDefault": true },
+      { "id": "refactorer", "path": "skills/refactorer/SKILL.md", "enabledDefault": true },
+      { "id": "researcher", "path": "skills/researcher/SKILL.md", "enabledDefault": true },
+      { "id": "reviewer", "path": "skills/reviewer/SKILL.md", "enabledDefault": true },
+      { "id": "security", "path": "skills/security/SKILL.md", "enabledDefault": true },
+      { "id": "security-reviewer", "path": "skills/security-reviewer/SKILL.md", "enabledDefault": true },
+      { "id": "tester", "path": "skills/tester/SKILL.md", "enabledDefault": true },
+      { "id": "verify", "path": "skills/verify/SKILL.md", "enabledDefault": true }
+    ],
+    "commands": [],
+    "hooks": [],
+    "mcpServers": [],
+    "reminders": []
+  }
+}
