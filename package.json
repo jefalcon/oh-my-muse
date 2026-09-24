@@ -1,0 +1,21 @@
+{
+  "name": "oh-my-muse",
+  "version": "0.1.0",
+  "description": "Token-efficient agent pack runner for Muse Spark",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "omm": "./bin/omm.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/cli.test.mjs test/e2e.test.mjs",
+    "smoke": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

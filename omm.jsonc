@@ -1,0 +1,25 @@
+// Example oh-my-muse agent pack configuration.
+// This file uses JSON with comments (jsonc). Strip comments before JSON.parse.
+{
+  // Default tier for agents that do not declare one.
+  "defaultTier": "balanced", // budget | balanced | premium
+  // Named agent definitions loaded by the runner.
+  "agents": [
+    {
+      "name": "code-helper",
+      "description": "Answers coding questions concisely.",
+      "tier": "balanced",
+      "systemPrompt": "You are a concise coding assistant.",
+      "tools": ["read", "edit"],
+      "maxTokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "name": "quick-chat",
+      "description": "Fast low-cost chat agent.",
+      "tier": "budget",
+      "systemPrompt": "You are a friendly chat assistant.",
+      "temperature": 0.7
+    }
+  ]
+}
