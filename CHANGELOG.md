@@ -25,3 +25,18 @@ All notable changes to this project are documented here. Format follows
 - Docs: `docs/MODES.md`, `docs/MODEL-COMPATIBILITY.md`, `docs/PARITY.md`.
 - CI (`.github/workflows/ci.yml`): typecheck, tests, smoke, and a
   weekly canary run.
+
+### Fixed
+
+- H1: notification file channel confined to the project root (lexical +
+  symlink realpath check, `allowExternalNotificationFile` opt-in).
+- M1: custom preset `extends` + inheritance-cycle detection +
+  `modelOverrides` (unknown-agent / empty-model rejection, overrides win).
+- M2: `webhookUrl` validated (https + discord/slack host allowlists) in
+  config validation, doctor, and at send time.
+- M3: committed `package-lock.json` so CI `npm ci` works on fresh checkouts.
+- M4: `redactText` scrubs discord/slack webhook URLs.
+- L1: `skill list` no longer follows symlinks. L2: `.gitignore` covers
+  `.claude/`. L3: `package.json` publish metadata (keywords, files).
+- Publish metadata: real repo URL (`github.com/javi/oh-my-muse`),
+  `repository`/`homepage`/`bugs`, LICENSE upstream attributions.

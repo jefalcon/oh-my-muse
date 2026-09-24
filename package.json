@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Token-efficient agent pack runner for Muse Spark",
   "keywords": ["muse", "muse-spark", "agents", "orchestration", "codebuff"],
-  "author": "oh-my-muse contributors",
+  "author": "Javi",
+  "repository": { "type": "git", "url": "https://github.com/javi/oh-my-muse.git" },
+  "homepage": "https://github.com/javi/oh-my-muse#readme",
+  "bugs": { "url": "https://github.com/javi/oh-my-muse/issues" },
   "license": "MIT",
   "type": "module",
   "bin": {
