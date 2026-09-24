@@ -4,27 +4,35 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import {
-  CONFIG_MODE,
-  installDirFor,
-  loadJsoncFile,
-  loadProjectConfig,
-  installPack,
-  updatePack,
-  uninstallPack,
-  doctor,
-  collectPackFiles,
-} from "../bin/lib.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const OMM_CLI = path.join(REPO_ROOT, "bin", "omm.mjs");
+const PLUGIN_DIR = path.join(REPO_ROOT, "plugin");
 
-function runCli(args, cwd) {
+const museAvailable = (() => {
+  try {
+    execFileSync("muse", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+function runCli(args, cwd, extraEnv = {}) {
   return execFileSync("node", [OMM_CLI, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, OMM_DIR: undefined },
+    env: { ...process.env, ...extraEnv },
   });
+}
+
+function runCliFail(args, cwd, extraEnv = {}) {
+  try {
+    runCli(args, cwd, extraEnv);
+  } catch (err) {
+    return { status: err.status ?? 1, output: `${err.stdout ?? ""}${err.stderr ?? ""}` };
+  }
+  assert.fail(`expected omm ${args.join(" ")} to fail`);
 }
 
 let tmpDirs = [];
@@ -41,136 +49,108 @@ afterEach(() => {
   tmpDirs = [];
 });
 
-describe("pack install/update/uninstall round-trip (absolute tmp dirs)", () => {
-  it("installs pack files, preserves config on update, removes on uninstall", () => {
-    const target = makeTmp();
-    assert.equal(path.isAbsolute(target), true);
+/** PATH with node but without muse, for no-muse error paths. */
+function pathWithoutMuse() {
+  return path.dirname(process.execPath);
+}
 
-    const relFiles = collectPackFiles(REPO_ROOT);
-    assert.ok(relFiles.length > 0, "repo must ship pack files");
-
-    const installed = installPack({ repoRoot: REPO_ROOT, targetDir: target });
-    const dest = installDirFor(target);
-    assert.equal(installed.dest, dest);
-    assert.ok(fs.existsSync(path.join(dest, "omm.jsonc")));
-    assert.equal(fs.statSync(path.join(dest, "omm.jsonc")).mode & 0o777, CONFIG_MODE);
-    assert.ok(fs.existsSync(path.join(dest, "omm-managed.json")));
-    assert.ok(fs.existsSync(path.join(dest, "pack", "agents", "planner.ts")));
-
-    const { config } = loadProjectConfig(target);
-    assert.ok(config, "installed config must load");
-
-    const checks = doctor({ repoRoot: REPO_ROOT, targetDir: target });
-    const failed = checks.filter((c) => !c.ok);
-    assert.deepEqual(failed, [], `doctor must pass, got: ${JSON.stringify(failed)}`);
-
-    const updated = updatePack({ repoRoot: REPO_ROOT, targetDir: target });
-    assert.ok(updated.files.includes("omm.jsonc"));
-
-    const removed = uninstallPack({ targetDir: target });
-    assert.ok(removed.removed.length > 0);
-    assert.equal(fs.existsSync(path.join(dest, "omm-managed.json")), false);
+describe("CLI surface", () => {
+  it("help lists the five commands", () => {
+    const out = runCli(["help"], makeTmp());
+    for (const cmd of ["install", "uninstall", "validate", "doctor", "notify"]) {
+      assert.ok(out.includes(cmd), `help must mention ${cmd}`);
+    }
   });
 
-  it("update without install throws", () => {
-    assert.throws(() => updatePack({ repoRoot: REPO_ROOT, targetDir: makeTmp() }), /run install first/);
+  it("unknown command fails with a clear error", () => {
+    const res = runCliFail(["frobnicate"], makeTmp());
+    assert.notEqual(res.status, 0);
+    assert.ok(res.output.includes("Unknown command"), res.output);
+  });
+
+  it("notify sends to the file channel in the cwd", () => {
+    const cwd = makeTmp();
+    const out = runCli(["notify", "--channel", "file", "--message", "deploy done", "--file", "n.log"], cwd);
+    assert.ok(out.includes("Notified via file"), out);
+    assert.match(fs.readFileSync(path.join(cwd, "n.log"), "utf8"), /deploy done/);
+  });
+
+  it("notify requires a message", () => {
+    const res = runCliFail(["notify", "--channel", "file"], makeTmp());
+    assert.notEqual(res.status, 0);
+    assert.ok(res.output.includes("--message"), res.output);
+  });
+
+  it("notify rejects an http webhook without leaking it", () => {
+    const res = runCliFail(
+      ["notify", "--channel", "discord", "--message", "hi", "--webhookUrl", "http://evil.example/x"],
+      makeTmp(),
+    );
+    assert.notEqual(res.status, 0);
+    assert.ok(!res.output.includes("http://evil.example/x"), "URL must not leak");
   });
 });
 
-describe("omm CLI end to end", () => {
-  it("setup -> install -> list -> doctor -> update -> uninstall", () => {
-    const target = makeTmp();
+describe("install/uninstall via a fake muse shim", () => {
+  function makeShim() {
+    const dir = makeTmp();
+    const log = path.join(dir, "calls.log");
+    const shim = path.join(dir, "muse");
+    fs.writeFileSync(shim, `#!/bin/sh\necho "$@" >> ${JSON.stringify(log)}\necho "shim-ok"\n`);
+    fs.chmodSync(shim, 0o755);
+    const calls = () => fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n") : [];
+    return { dir, calls };
+  }
 
-    runCli(["setup", "--dir", target], REPO_ROOT);
-    const setupFile = path.join(installDirFor(target), "omm.jsonc");
-    assert.equal(fs.existsSync(setupFile), true);
-    assert.equal(fs.statSync(setupFile).mode & 0o777, CONFIG_MODE);
-
-    const installOut = runCli(["install", "--dir", target], REPO_ROOT);
-    assert.match(installOut, /Installed \d+ files/);
-
-    const listOut = runCli(["list", "--dir", target], REPO_ROOT);
-    assert.match(listOut, /code-helper|No agents configured/);
-
-    const listJson = runCli(["list", "--dir", target, "--json"], REPO_ROOT);
-    assert.ok(Array.isArray(JSON.parse(listJson)));
-
-    runCli(["doctor", "--dir", target], REPO_ROOT);
-
-    const updateOut = runCli(["update", "--dir", target], REPO_ROOT);
-    assert.match(updateOut, /Updated \d+ files/);
-
-    const uninstallOut = runCli(["uninstall", "--dir", target], REPO_ROOT);
-    assert.match(uninstallOut, /Removed|Nothing tracked/);
+  it("install calls plugins install with the package plugin dir and prints (not runs) approve", () => {
+    const { dir, calls } = makeShim();
+    const out = runCli(["install", "--scope", "user"], makeTmp(), { PATH: `${dir}${path.delimiter}${process.env.PATH}` });
+    assert.deepEqual(calls(), [`plugins install ${PLUGIN_DIR} --scope user`]);
+    assert.ok(out.includes("muse plugins approve oh-my-muse"), "must print the pending approve step");
   });
 
-  it("preset show and config get/set round-trip", () => {
-    const target = makeTmp();
-    runCli(["setup", "--dir", target], REPO_ROOT);
-
-    const presetOut = runCli(["preset", "code", "--dir", target], REPO_ROOT);
-    const preset = JSON.parse(presetOut);
-    assert.equal(preset.tier, "balanced");
-
-    runCli(["config", "set", "defaultTier", "premium", "--dir", target], REPO_ROOT);
-    const getOut = runCli(["config", "get", "defaultTier", "--dir", target], REPO_ROOT);
-    assert.equal(JSON.parse(getOut), "premium");
+  it("install rejects a bad scope without calling muse", () => {
+    const { dir, calls } = makeShim();
+    const res = runCliFail(["install", "--scope", "global"], makeTmp(), { PATH: `${dir}${path.delimiter}${process.env.PATH}` });
+    assert.ok(res.output.includes("--scope must be user|project"), res.output);
+    assert.deepEqual(calls(), [], "muse must not be called on bad scope");
   });
 
-  it("config set rejects invalid tiers", () => {
-    const target = makeTmp();
-    runCli(["setup", "--dir", target], REPO_ROOT);
-    assert.throws(() => runCli(["config", "set", "defaultTier", "gold", "--dir", target], REPO_ROOT));
+  it("uninstall calls plugins remove", () => {
+    const { dir, calls } = makeShim();
+    runCli(["uninstall"], makeTmp(), { PATH: `${dir}${path.delimiter}${process.env.PATH}` });
+    assert.deepEqual(calls(), ["plugins remove oh-my-muse"]);
+  });
+});
+
+describe("no-muse error paths", () => {
+  it("install without muse fails with a clear error", () => {
+    const res = runCliFail(["install"], makeTmp(), { PATH: pathWithoutMuse() });
+    assert.notEqual(res.status, 0);
+    assert.ok(res.output.includes("muse CLI not found in PATH"), res.output);
   });
 
-  it("notify file channel appends to an absolute file", () => {
-    const target = makeTmp();
-    const logFile = path.join(target, "notify.log");
-    const out = runCli(
-      ["notify", "--channel", "file", "--message", "hello e2e", "--file", logFile, "--dir", target],
-      REPO_ROOT,
-    );
-    assert.match(out, /Notified via file/);
-    assert.match(fs.readFileSync(logFile, "utf8"), /hello e2e/);
+  it("validate without muse fails with a clear error", () => {
+    const res = runCliFail(["validate"], makeTmp(), { PATH: pathWithoutMuse() });
+    assert.notEqual(res.status, 0);
+    assert.ok(res.output.includes("muse CLI not found in PATH"), res.output);
   });
 
-  it("skill list shows installed skills", () => {
-    const target = makeTmp();
-    runCli(["install", "--dir", target], REPO_ROOT);
-    const out = runCli(["skill", "list", "--dir", target], REPO_ROOT);
-    assert.match(out, /verify|tdd|security/);
+  it("doctor without muse reports the missing binary and fails", () => {
+    const res = runCliFail(["doctor"], makeTmp(), { PATH: pathWithoutMuse() });
+    assert.notEqual(res.status, 0);
+    assert.ok(res.output.includes("muse in PATH"), res.output);
+  });
+});
+
+describe("real muse round-trips", { skip: !museAvailable ? "muse CLI not in PATH" : false }, () => {
+  it("validate passes on the shipped plugin", () => {
+    const out = runCli(["validate"], makeTmp());
+    assert.ok(out.includes("ok   plugin"), out);
   });
 
-  it("config-driven notify file outside the project is refused without opt-in", () => {
-    const target = makeTmp();
-    runCli(["setup", "--dir", target], REPO_ROOT);
-    const outside = path.join(makeTmp(), "outside.log");
-    runCli(["config", "set", "notify.ext.channel", "file", "--dir", target], REPO_ROOT);
-    runCli(["config", "set", "notify.ext.file", outside, "--dir", target], REPO_ROOT);
-    assert.throws(
-      () => runCli(["notify", "--channel", "file", "--message", "nope", "--hook", "ext", "--dir", target], REPO_ROOT),
-      /outside project root/,
-    );
-    assert.equal(fs.existsSync(outside), false);
-    runCli(["config", "set", "allowExternalNotificationFile", "true", "--dir", target], REPO_ROOT);
-    const out = runCli(["notify", "--channel", "file", "--message", "opted in", "--hook", "ext", "--dir", target], REPO_ROOT);
-    assert.match(out, /Notified via file/);
-    assert.match(fs.readFileSync(outside, "utf8"), /opted in/);
-  });
-
-  it("modelOverrides pin survives preset application", () => {
-    const target = makeTmp();
-    runCli(["setup", "--dir", target], REPO_ROOT);
-    const cfgFile = path.join(installDirFor(target), "omm.jsonc");
-    const cfg = loadJsoncFile(cfgFile);
-    cfg.agents = [{ name: "pinned", systemPrompt: "s", tier: "budget" }];
-    cfg.modelOverrides = { pinned: "custom-model-1" };
-    fs.writeFileSync(cfgFile, `${JSON.stringify(cfg, null, 2)}\n`);
-    const listOut = runCli(["list", "--dir", target, "--json"], REPO_ROOT);
-    const agents = JSON.parse(listOut);
-    assert.equal(agents.find((a) => a.name === "pinned").model, "custom-model-1");
-    runCli(["preset", "code", "--apply", "pinned", "--dir", target], REPO_ROOT);
-    const listOut2 = runCli(["list", "--dir", target, "--json"], REPO_ROOT);
-    assert.equal(JSON.parse(listOut2).find((a) => a.name === "pinned").model, "custom-model-1");
+  it("doctor passes on this checkout", () => {
+    const out = runCli(["doctor"], REPO_ROOT);
+    assert.ok(out.includes("validators pass"), out);
   });
 });

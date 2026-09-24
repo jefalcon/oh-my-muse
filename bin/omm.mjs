@@ -1,70 +1,44 @@
 #!/usr/bin/env node
-import fs from "node:fs";
 import path from "node:path";
 import {
-  TIERS,
-  TIER_MODELS,
-  CONFIG_FILENAME,
-  MANAGED_FILENAME,
-  repoRootFromHere,
-  resolveTargetDir,
-  installDirFor,
-  loadJsoncFile,
-  writeFileMode,
-  expandEnv,
-  redactConfig,
+  PLUGIN_ID,
+  pluginDirFromHere,
+  findMuse,
+  requireMuse,
+  runMuse,
+  museVersion,
+  validatePlugin,
+  installArgs,
   redactText,
-  isTier,
-  modelForTier,
-  loadModelsFile,
-  getPreset,
-  applyPreset,
-  applyModelOverrides,
-  validateModelOverrides,
-  validateConfig,
-  loadProjectConfig,
-  readManifest,
-  collectPackFiles,
-  installPack,
-  updatePack,
-  uninstallPack,
-  doctor,
 } from "./lib.mjs";
-import { sendNotification, CHANNELS } from "../hooks/notify.mjs";
+import { sendNotification, CHANNELS } from "../plugin/hooks/notify.mjs";
 
-const REPO_ROOT = repoRootFromHere(import.meta.url);
+const PLUGIN_DIR = pluginDirFromHere(import.meta.url);
 
-const HELP = `omm — oh-my-muse pack manager
+const HELP = `omm — oh-my-muse native plugin manager
 
 Usage: omm <command> [options]
 
 Commands:
-  setup [--dir <path>]              Write a default omm.jsonc (0600) if missing
-  install [--dir <path>]            Install pack into <dir>/.claude/oh-my-muse (staging + atomic)
-  update [--dir <path>]             Update the installed pack (staging + atomic)
-  uninstall [--dir <path>]          Remove files tracked in omm-managed.json
-  doctor [--dir <path>]             Check node, config, tiers, webhooks, permissions
-  list [--dir <path>] [--json]      List configured agents
-  preset <name> [--dir <path>]      Show a preset, or --apply <agent> to apply it
-  config <get|set|show> [key] [v]   Read or modify omm.jsonc (values support $ENV expansion)
-  skill <list> [--dir <path>]       List installed skills
-  notify --channel <c> --message <m> Send a notification (telegram|discord|slack|file)
+  install [--scope user|project]  Install the plugin into Muse (prints the pending approve step)
+  uninstall                       Remove ${PLUGIN_ID} from Muse
+  validate                        Run both real validators (skills, then plugin)
+  doctor                          Check node, muse in PATH, muse version, validation
+  notify --channel <c> --message <m>
+                                  Send a notification (telegram|discord|slack|file)
 
-Global options: --dir <path>  Target project dir (default: cwd). Paths are absolute.
-Env: OMM_DIR overrides --dir. Secrets in output are redacted; webhooks must be https.
-File-channel notes land inside --dir unless the project config sets
-allowExternalNotificationFile=true (or OMM_ALLOW_EXTERNAL_NOTIFY_FILE=1);
+Env: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL,
+SLACK_WEBHOOK_URL, OMM_NOTIFY_FILE. Secrets in output are redacted;
+webhooks must be https (discord/slack host allowlists enforced).
+File-channel notes land inside the cwd unless OMM_NOTIFY_ALLOW_EXTERNAL=1;
 an explicit notify --file <path> always opts out.
 `;
 
 function parseArgs(argv) {
-  const out = { _: [], dir: null, json: false };
+  const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--dir" || a === "--target") out.dir = argv[++i] ?? null;
-    else if (a.startsWith("--dir=")) out.dir = a.slice(6);
-    else if (a === "--json") out.json = true;
-    else if (a.startsWith("--")) {
+    if (a.startsWith("--")) {
       const eq = a.indexOf("=");
       if (eq !== -1) out[a.slice(2, eq)] = a.slice(eq + 1);
       else if (argv[i + 1] && !argv[i + 1].startsWith("--")) out[a.slice(2)] = argv[++i];
@@ -74,187 +48,60 @@ function parseArgs(argv) {
   return out;
 }
 
-function targetOf(args) {
-  return resolveTargetDir(process.cwd(), args.dir ?? process.env.OMM_DIR ?? ".");
-}
-
 function fail(err) {
   console.error(redactText(err?.message ?? String(err)));
   process.exit(1);
 }
 
-function defaultConfigText() {
-  return `// oh-my-muse configuration (JSONC). Secrets may use $ENV references.
-{
-  // Default tier for agents that do not declare one.
-  "defaultTier": "balanced", // ${TIERS.join(" | ")}
-  "agents": [],
-  "notify": {}
-}
-`;
-}
-
-function cmdSetup(args) {
-  const target = targetOf(args);
-  const file = path.join(installDirFor(target), CONFIG_FILENAME);
-  if (fs.existsSync(file)) {
-    console.log(`Exists: ${file}`);
-    return;
-  }
-  writeFileMode(file, defaultConfigText());
-  console.log(`Created ${file} (0600)`);
-}
-
 function cmdInstall(args) {
-  const target = targetOf(args);
-  const { dest, files } = installPack({ repoRoot: REPO_ROOT, targetDir: target });
-  console.log(`Installed ${files.length} files to ${dest}`);
+  const scope = args.scope !== undefined ? String(args.scope) : undefined;
+  const argv = installArgs(PLUGIN_DIR, scope);
+  const res = runMuse(argv);
+  if (res.status !== 0) fail(`muse ${argv.join(" ")} failed: ${res.stderr || res.stdout}`);
+  process.stdout.write(res.stdout);
+  console.log(`Installed ${PLUGIN_ID} from ${PLUGIN_DIR}.`);
+  console.log(`Pending step (not executed): run \`muse plugins approve ${PLUGIN_ID}\` yourself to trust and enable it.`);
 }
 
-function cmdUpdate(args) {
-  const target = targetOf(args);
-  const { dest, files } = updatePack({ repoRoot: REPO_ROOT, targetDir: target });
-  console.log(`Updated ${files.length} files in ${dest}`);
+function cmdUninstall() {
+  const res = runMuse(["plugins", "remove", PLUGIN_ID]);
+  if (res.status !== 0) fail(`muse plugins remove ${PLUGIN_ID} failed: ${res.stderr || res.stdout}`);
+  process.stdout.write(res.stdout);
+  console.log(`Removed ${PLUGIN_ID}.`);
 }
 
-function cmdUninstall(args) {
-  const target = targetOf(args);
-  const { dest, removed } = uninstallPack({ targetDir: target });
-  console.log(removed.length === 0 ? `Nothing tracked; cleaned ${dest}` : `Removed ${removed.length} files from ${dest}`);
+function cmdValidate() {
+  requireMuse();
+  const results = validatePlugin({ pluginDir: PLUGIN_DIR });
+  for (const s of results.skills) console.log(`ok   skill ${path.basename(s.dir)}`);
+  console.log("ok   plugin");
+  console.log(`Validated ${results.skills.length} skills + plugin.`);
 }
 
-function cmdDoctor(args) {
-  const target = targetOf(args);
-  const checks = doctor({ repoRoot: REPO_ROOT, targetDir: target });
+function cmdDoctor() {
   let failed = 0;
-  for (const c of checks) {
-    console.log(`${c.ok ? "ok  " : "FAIL"}  ${c.message}`);
-    if (!c.ok) failed++;
+  const check = (ok, message) => {
+    console.log(`${ok ? "ok  " : "FAIL"}  ${message}`);
+    if (!ok) failed++;
+  };
+  const major = Number(process.versions.node.split(".")[0]);
+  check(major >= 20, `node >= 20 (found ${process.version})`);
+  const musePath = findMuse();
+  check(musePath !== null, musePath ? `muse in PATH (${musePath})` : "muse in PATH (missing: install Muse Code and add `muse` to PATH)");
+  if (musePath) {
+    try {
+      check(true, `muse version: ${museVersion({ musePath })}`);
+    } catch (err) {
+      check(false, `muse --version failed: ${err.message}`);
+    }
+    try {
+      const results = validatePlugin({ pluginDir: PLUGIN_DIR, musePath });
+      check(true, `validators pass (${results.skills.length} skills + plugin)`);
+    } catch (err) {
+      check(false, `validation: ${err.message}`);
+    }
   }
   if (failed > 0) process.exit(1);
-}
-
-function cmdList(args) {
-  const target = targetOf(args);
-  const { config, file } = loadProjectConfig(target);
-  if (!config) fail(`No config at ${file}; run: omm setup --dir ${target}`);
-  const defTier = config.defaultTier ?? "balanced";
-  const overrides = validateModelOverrides(config);
-  const agents = (config.agents ?? []).map((raw) => {
-    const a = applyModelOverrides(raw, overrides);
-    return {
-      name: a.name,
-      tier: a.tier ?? defTier,
-      model: a.model ?? (isTier(a.tier ?? defTier) ? TIER_MODELS[a.tier ?? defTier] : "(invalid tier)"),
-      description: a.description ?? "",
-    };
-  });
-  if (args.json) {
-    console.log(JSON.stringify(redactConfig(agents), null, 2));
-    return;
-  }
-  if (agents.length === 0) console.log(`No agents configured (${file})`);
-  for (const a of agents) console.log(`${a.name}  [${a.tier}]  ${a.model}  ${a.description}`);
-}
-
-function cmdPreset(args) {
-  const target = targetOf(args);
-  const name = args._[1];
-  if (!name) fail("Usage: omm preset <name> [--apply <agent>] [--dir <path>]");
-  const models = loadModelsFile(REPO_ROOT);
-  const preset = getPreset(models, name);
-  if (args.apply) {
-    const { config, file } = loadProjectConfig(target);
-    if (!config) fail(`No config at ${file}; run: omm setup --dir ${target}`);
-    const agentName = String(args.apply);
-    const idx = (config.agents ?? []).findIndex((a) => a.name === agentName);
-    if (idx === -1) fail(`Agent "${agentName}" not found in ${file}`);
-    config.agents[idx] = applyModelOverrides(applyPreset(config.agents[idx], preset), validateModelOverrides(config));
-    validateConfig(expandEnv(config));
-    const raw = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-    void raw;
-    writeFileMode(file, `${JSON.stringify(config, null, 2)}\n`);
-    console.log(`Applied preset "${name}" to agent "${agentName}" in ${file}`);
-    return;
-  }
-  console.log(JSON.stringify(redactConfig(preset), null, 2));
-}
-
-function getPath(obj, dotted) {
-  return dotted.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
-}
-
-function setPath(obj, dotted, value) {
-  const keys = dotted.split(".");
-  let cur = obj;
-  for (let i = 0; i < keys.length - 1; i++) {
-    if (cur[keys[i]] === undefined || typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
-    cur = cur[keys[i]];
-  }
-  cur[keys[keys.length - 1]] = value;
-}
-
-function coerceValue(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function cmdConfig(args) {
-  const target = targetOf(args);
-  const sub = args._[1] ?? "show";
-  const { config, file } = loadProjectConfig(target);
-  if (sub === "show") {
-    if (!config) fail(`No config at ${file}; run: omm setup --dir ${target}`);
-    console.log(JSON.stringify(redactConfig(expandEnv(config)), null, 2));
-    return;
-  }
-  if (sub === "get") {
-    const key = args._[2];
-    if (!key) fail("Usage: omm config get <dotted.key>");
-    if (!config) fail(`No config at ${file}`);
-    const val = getPath(expandEnv(config), key);
-    console.log(JSON.stringify(redactConfig(val), null, 2) ?? "null");
-    return;
-  }
-  if (sub === "set") {
-    const key = args._[2];
-    const rawVal = args._[3] ?? args.value;
-    if (!key || rawVal === undefined) fail("Usage: omm config set <dotted.key> <json-or-string>");
-    if (!config) fail(`No config at ${file}; run: omm setup --dir ${target}`);
-    const base = loadJsoncFile(file);
-    setPath(base, key, coerceValue(String(rawVal)));
-    if (key === "defaultTier" || key.endsWith(".tier")) {
-      const t = getPath(base, key);
-      if (!isTier(t)) fail(`tier must be one of ${TIERS.join("|")}`);
-      void modelForTier(t);
-    }
-    validateConfig(expandEnv(base));
-    writeFileMode(file, `${JSON.stringify(base, null, 2)}\n`);
-    console.log(`Set ${key} in ${file}`);
-    return;
-  }
-  fail(`Unknown config subcommand "${sub}"; expected get|set|show`);
-}
-
-function cmdSkill(args) {
-  const target = targetOf(args);
-  const sub = args._[1] ?? "list";
-  if (sub !== "list") fail(`Unknown skill subcommand "${sub}"; expected list`);
-  const skillsDir = path.join(installDirFor(target), "pack", "skills");
-  const repoSkills = path.join(REPO_ROOT, "pack", "skills");
-  const dir = fs.existsSync(skillsDir) ? skillsDir : repoSkills;
-  if (!fs.existsSync(dir)) fail(`No skills found under ${dir}`);
-  const names = fs.readdirSync(dir).filter((n) => {
-    try {
-      return fs.lstatSync(path.join(dir, n)).isDirectory();
-    } catch {
-      return false;
-    }
-  }).sort();
-  for (const n of names) console.log(n);
 }
 
 async function cmdNotify(args) {
@@ -262,24 +109,28 @@ async function cmdNotify(args) {
   const message = String(args.message ?? args.text ?? args._[2] ?? "");
   if (!CHANNELS.includes(channel)) fail(`Usage: omm notify --channel ${CHANNELS.join("|")} --message <text>`);
   if (!message) fail("notify requires --message <text>");
-  const target = targetOf(args);
-  const { config } = loadProjectConfig(target);
-  const named = String(args.hook ?? args.name ?? "");
-  const hook = { ...((named && config?.notify?.[named]) || config?.notify?.[channel] || {}) };
+  const hook = {};
   if (args.url) hook.url = String(args.url);
   if (args.webhookUrl) hook.webhookUrl = String(args.webhookUrl);
   if (args.botToken) hook.botToken = String(args.botToken);
   if (args.chatId) hook.chatId = String(args.chatId);
-  // An explicit --file flag is the user's own action and opts out of project
-  // confinement. A config-driven path stays confined unless the config opts
-  // in via allowExternalNotificationFile (or OMM_ALLOW_EXTERNAL_NOTIFY_FILE=1).
+  // An explicit --file flag is the user's own action and opts out of root
+  // confinement; an env-driven path stays confined unless explicitly allowed.
   const explicitFile = args.file ? String(args.file) : null;
   if (explicitFile) hook.file = explicitFile;
-  const allowExternalFile = explicitFile !== null
-    || config?.allowExternalNotificationFile === true
-    || process.env.OMM_ALLOW_EXTERNAL_NOTIFY_FILE === "1";
-  await sendNotification({ channel, message, projectName: args.project, vars: {}, hook, root: target, allowExternalFile });
-  console.log(`Notified via ${channel}.`);
+  else if (process.env.OMM_NOTIFY_FILE) hook.file = process.env.OMM_NOTIFY_FILE;
+  const allowExternalFile = explicitFile !== null || process.env.OMM_NOTIFY_ALLOW_EXTERNAL === "1";
+  const result = await sendNotification({
+    channel,
+    message,
+    projectName: args.project,
+    vars: {},
+    hook,
+    root: process.cwd(),
+    allowExternalFile,
+  });
+  if (channel === "file") console.log(`Notified via file: ${result.file}`);
+  else console.log(`Notified via ${channel}.`);
 }
 
 async function main() {
@@ -291,15 +142,10 @@ async function main() {
   }
   try {
     switch (cmd) {
-      case "setup": cmdSetup(args); break;
       case "install": cmdInstall(args); break;
-      case "update": cmdUpdate(args); break;
-      case "uninstall": cmdUninstall(args); break;
-      case "doctor": cmdDoctor(args); break;
-      case "list": cmdList(args); break;
-      case "preset": cmdPreset(args); break;
-      case "config": cmdConfig(args); break;
-      case "skill": cmdSkill(args); break;
+      case "uninstall": cmdUninstall(); break;
+      case "validate": cmdValidate(); break;
+      case "doctor": cmdDoctor(); break;
       case "notify": await cmdNotify(args); break;
       default: fail(`Unknown command "${cmd}". Run: omm help`);
     }

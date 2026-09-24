@@ -5,96 +5,111 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![ESM](https://img.shields.io/badge/modules-ESM-yellow)](package.json)
 
-Token-efficient agent pack runner for Muse Spark. Three literal tiers
-(`budget` | `balanced` | `premium`), atomic installs, validated configs,
-and redacted secrets.
+Native [Muse Code](https://github.com/anthropics/muse-code) plugin:
+18 specialist skills, 7 orchestrator commands, and turn/session-end
+notifications. No tiers, no presets, no model routing — the model is chosen
+per session (see below).
 
 ## Install
 
-Requires Node.js `>= 20` (ES modules).
+Requires Node.js `>= 20` and Muse Code `1.3.0+` with `muse` on `PATH`.
 
 ```sh
-git clone https://github.com/jefalcon/oh-my-muse.git
-cd oh-my-muse
-node bin/omm.mjs --help
+npm install -g oh-my-muse
+omm install
+omm install --scope user   # or: --scope project
 ```
 
-Use it in a project (paths are absolute; `--dir` defaults to cwd):
+`omm install` resolves the shipped `plugin/` directory from the installed
+package (never from the cwd) and runs `muse plugins install <plugin-dir>`.
+It then prints a pending step it deliberately does **not** execute:
 
 ```sh
-node /absolute/path/to/oh-my-muse/bin/omm.mjs setup --dir /absolute/path/to/project
-node /absolute/path/to/oh-my-muse/bin/omm.mjs install --dir /absolute/path/to/project
-node /absolute/path/to/oh-my-muse/bin/omm.mjs doctor --dir /absolute/path/to/project
+muse plugins approve oh-my-muse
 ```
 
-Or link the binary once:
+Run that yourself to trust and enable the plugin. Verify any time with:
 
 ```sh
-npm link
-omm setup --dir /absolute/path/to/project
-omm install --dir /absolute/path/to/project
+omm validate   # both real validators: skills, then plugin
+omm doctor     # node, muse in PATH, muse version, validation
 ```
 
-## Examples
+## Choosing the model
 
-List configured agents with resolved tier and model:
+There are no tiers or presets in 0.2.0. The session model applies to every
+skill and command. Pick it per invocation or persistently:
 
 ```sh
-omm list --dir /absolute/path/to/project
-omm list --json --dir /absolute/path/to/project
+muse --model muse-spark-1.3-contributor
 ```
 
-Show or apply a model preset (`code`, `chat`, `reason`, plus custom ones
-in `models.json`):
+or in `${XDG_CONFIG_HOME:-$HOME/.config}/muse/settings.json`:
+
+```json
+{ "schema_version": 1, "model": "muse-spark-1.3-contributor" }
+```
+
+(A tier-driven `muse exec` wrapper is deferred to a later version.)
+
+## Use
+
+Commands (each loads `workflow-authoring` and runs its wave plan + gate):
+
+| Command          | Orchestration                                             |
+| ---------------- | --------------------------------------------------------- |
+| `/omm-team`      | Parallel research, serialized same-file edits, reviewer loop |
+| `/omm-autopilot` | One driver owns the change, helpers support it            |
+| `/omm-ultrawork` | Maximum parallelism for independent steps                 |
+| `/omm-pipeline`  | Strict sequence with a verify-command gate per step       |
+| `/omm-ultraqa`   | Parallel checks under a zero-failure gate                 |
+| `/omm-ralph`     | One unfinished step per loop iteration, pass/fail check   |
+| `/omm-advisor`   | Three independent advisors reconciled into one decision   |
+
+Skills (loaded by the model, `user-invocable: false`): `architect`,
+`critic`, `data-scientist`, `debugger`, `designer`, `docs-writer`,
+`file-picker`, `implementer`, `planner`, `refactorer`, `researcher`,
+`reviewer`, `security-reviewer`, `tester`, plus `harness`, `verify`,
+`docs`, `security`.
+
+Notifications: the `omm-notify-stop` (`Stop`) and `omm-notify-end`
+(`SessionEnd`) hooks share the self-contained `plugin/hooks/notify.mjs`.
+They are silent unless `OMM_NOTIFY_CHANNEL` is set:
 
 ```sh
-omm preset code --dir /absolute/path/to/project
-omm preset reason --apply planner --dir /absolute/path/to/project
+export OMM_NOTIFY_CHANNEL=file        # telegram|discord|slack|file
+export OMM_NOTIFY_FILE=omm-notify.log # confined to the session cwd
 ```
 
-Read and change config (values support `$ENV` / `${VAR:-default}`):
+Telegram needs `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`; Discord/Slack
+need `DISCORD_WEBHOOK_URL` / `SLACK_WEBHOOK_URL` (https + provider host
+allowlist enforced; secrets redacted from every diagnostic). On-demand:
 
 ```sh
-omm config show --dir /absolute/path/to/project
-omm config get defaultTier --dir /absolute/path/to/project
-omm config set defaultTier premium --dir /absolute/path/to/project
+omm notify --channel file --message "deploy done" --file ./notify.log
 ```
 
-Skills, notifications, and maintenance:
+An explicit `--file` opts out of root confinement; env-driven paths stay
+confined unless `OMM_NOTIFY_ALLOW_EXTERNAL=1`.
+
+## Uninstall
 
 ```sh
-omm skill list --dir /absolute/path/to/project
-omm notify --channel file --message "deploy done" --file /absolute/path/to/notify.log
-omm update --dir /absolute/path/to/project
-omm uninstall --dir /absolute/path/to/project
+omm uninstall   # muse plugins remove oh-my-muse
 ```
-
-## Tiers
-
-| Tier       | Model                | Use for             |
-| ---------- | -------------------- | ------------------- |
-| `budget`   | `muse-spark-fast`    | fast, low-cost chat |
-| `balanced` | `muse-spark`         | general coding work |
-| `premium`  | `muse-spark-reasoning` | deep reasoning    |
-
-Details: [docs/MODES.md](docs/MODES.md),
-[docs/MODEL-COMPATIBILITY.md](docs/MODEL-COMPATIBILITY.md),
-[docs/PARITY.md](docs/PARITY.md).
 
 ## Development
 
 ```sh
-npm run typecheck   # tsc --noEmit
-npm test            # node --test test/
-node test/smoke.mjs # agent shape validation
+npm test   # node --test test/ (validators skip cleanly when muse is absent)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md),
+[docs/PARITY.md](docs/PARITY.md), [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md),
 and [SECURITY.md](SECURITY.md).
 
 ## Attribution
 
 Built for the Muse Spark ecosystem. This is a community project and is
 **not affiliated with Meta**. "Muse" and "Muse Spark" model names belong
-to their respective owners; model availability and pricing are governed
-by the provider, including OpenRouter-routed models.
+to their respective owners.

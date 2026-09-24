@@ -1,13 +1,14 @@
 {
   "name": "oh-my-muse",
-  "version": "0.1.1",
-  "description": "Token-efficient agent pack runner for Muse Spark",
+  "version": "0.2.0",
+  "description": "Native Muse Code plugin: specialist skills, orchestrator commands, and turn-end notifications",
   "keywords": [
     "muse",
-    "muse-spark",
-    "agents",
-    "orchestration",
-    "codebuff"
+    "muse-code",
+    "plugin",
+    "skills",
+    "commands",
+    "orchestration"
   ],
   "author": "Javi",
   "repository": {
@@ -25,12 +26,7 @@
   },
   "files": [
     "bin/",
-    "hooks/",
-    "pack/",
-    "src/",
-    "types/",
-    "models.json",
-    "omm.jsonc",
+    "plugin/",
     "README.md",
     "LICENSE"
   ],
@@ -38,11 +34,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "node --test test/cli.test.mjs test/e2e.test.mjs",
-    "smoke": "node test/smoke.mjs"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0"
+    "test": "node --test test/cli.test.mjs test/e2e.test.mjs test/validators.test.mjs test/tarball.test.mjs"
   }
 }

@@ -3,6 +3,59 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0] - 2026-09-24
+
+### **BREAKING**
+
+- The 0.1.x TypeScript pack under `.claude/oh-my-muse` is gone. The
+  project now ships a native Muse Code plugin (`plugin/`).
+- Removed commands and their equivalents:
+  - `omm setup` / `install` (file staging) → `omm install [--scope
+    user|project]` (runs `muse plugins install`, then prints the pending
+    `muse plugins approve oh-my-muse` step without executing it).
+  - `omm update` → `muse plugins update oh-my-muse`.
+  - `omm list` / `preset` / `config` / `skill` → removed with the tier +
+    config layer (model is chosen per session via `muse --model` or
+    `settings.json`).
+  - `omm doctor` → kept, now checks node, `muse` in PATH, version, and
+    both validators.
+  - `omm notify` → kept, simplified to args + env (no project config).
+- Removed: `pack/`, `types/`, `models.json`, `omm.jsonc`, `tsconfig.json`,
+  `test/smoke.mjs`, `docs/MODES.md`, `docs/MODEL-COMPATIBILITY.md`,
+  `npm run typecheck` / `npm run smoke`, and the `typescript`
+  devDependency.
+- Removed overlapping agents/skills (see `docs/PARITY.md`): skill `tdd`
+  (muse-core `durable-test-collateral`), skill `design` (muse-core
+  `taste`), `muse-deep-interview` (muse-core `grill` /
+  `requirements-clarification`), `muse-ralplan` (muse-core `plan`).
+- Removed tiers, presets, and OpenRouter routing. Dropped agent fields
+  with no native equivalent: `tier`, `model`, `tools`, `maxTokens`,
+  `temperature`.
+
+### Added
+
+- Native plugin `oh-my-muse` 0.2.0: 18 skills (`architect`, `critic`,
+  `data-scientist`, `debugger`, `designer`, `docs-writer`, `file-picker`,
+  `implementer`, `planner`, `refactorer`, `researcher`, `reviewer`,
+  `security-reviewer`, `tester`, `harness`, `verify`, `docs`,
+  `security`), 7 commands (`omm-team`, `omm-autopilot`, `omm-ultrawork`,
+  `omm-pipeline`, `omm-ultraqa`, `omm-ralph`, `omm-advisor`), and 2 hooks
+  (`omm-notify-stop` on `Stop`, `omm-notify-end` on `SessionEnd`) sharing
+  a self-contained `plugin/hooks/notify.mjs`.
+- `docs/OPEN-QUESTIONS.md`: schema findings (no workflow-launch entry,
+  full valid hook-event list, `duplicate-hook-source`).
+- Tests: real validators with `t.skip()` when `muse` is absent, kept
+  notify/redaction coverage, tarball-content test, CLI round-trips with a
+  fake-`muse` shim.
+
+## [0.1.1] - 2026-09-24
+
+### Fixed
+
+- Drop `registry-url` from the publish workflow to allow OIDC token
+  exchange (fixes 403 OIDC permission denied).
+- Use Node 24 for npm OIDC trusted publishing (requires npm 11.5.1+).
+
 ## [0.1.0] - 2026-09-24
 
 ### Added

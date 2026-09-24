@@ -16,9 +16,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
       - run: npm test
-      - run: node test/smoke.mjs
 
   canary:
     if: github.event_name == 'schedule'
@@ -29,7 +27,5 @@ jobs:
         with:
           node-version: latest
       - run: npm ci
-      - run: npm run typecheck
       - run: npm test
-      - run: node test/smoke.mjs
       - run: node bin/omm.mjs --help

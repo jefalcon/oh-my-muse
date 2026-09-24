@@ -1,29 +1,34 @@
-# READY TO PUBLISH — oh-my-muse 0.1.0
+# READY TO PUBLISH — oh-my-muse 0.2.0
 
 Repo URL: `https://github.com/jefalcon/oh-my-muse`
 No remote is configured yet. Run, in order:
 
 ```sh
-git remote add origin https://github.com/jefalcon/oh-my-muse.git
-git push -u origin main
+git push -u origin muse-native
+# merge muse-native, tag, then:
 npm publish --access public
 ```
 
-## Final checklist
+## Final checklist (0.2.0)
 
-- [ ] `git push` succeeds; repo visible at github.com/jefalcon/oh-my-muse
-- [ ] CI badge green (push run: typecheck + tests + smoke)
-- [ ] npm page live: `https://www.npmjs.com/package/oh-my-muse` shows 0.1.0,
-      README, repository/homepage/bugs links
-- [ ] Fresh install works from npm:
-      `npm install -g oh-my-muse` (or `npx oh-my-muse`) then
-      `omm install --dir /tmp/probe && omm doctor --dir /tmp/probe`
+- [ ] Branch `muse-native` merged; tag `v0.2.0` pushed
+- [ ] CI badge green (push run: `npm ci` + `npm test`)
+- [ ] `omm validate`: 18 skills + plugin, `valid: true`, zero diagnostics
+- [ ] `npm test`: all pass locally (validators run; skip only without Muse)
+- [ ] `npm pack --dry-run` lists `plugin/.muse-plugin/plugin.json`,
+      all skills, commands, hooks, and `bin/omm.mjs`; no `pack/`
+- [ ] npm page live: `https://www.npmjs.com/package/oh-my-muse` shows
+      0.2.0, README, repository/homepage/bugs links
+- [ ] Fresh install works from npm: `npm install -g oh-my-muse`, then
+      `omm install --scope user`, then the printed
+      `muse plugins approve oh-my-muse`, then `omm doctor` exit 0
 - [ ] Weekly canary scheduled (Mondays 06:00 UTC, `.github/workflows/ci.yml`)
 
 ## Pre-publish verification (done 2026-09-24)
 
-- `npm run typecheck`: clean
-- `npm test`: 46/46 pass
-- `node bin/omm.mjs doctor --dir .`: exit 0
-- `node test/smoke.mjs`: 23 agents / 3 presets
-- `npm pack --dry-run`: 41 files, no warnings
+- `muse skills validate plugin/skills/* --json`: 18/18 exit 0,
+  `valid: true`, `diagnostics: []`
+- `muse plugins validate plugin --json`: `valid: true`, `diagnostics: []`
+- `npm test`: 34/34 pass
+- `node bin/omm.mjs doctor`: exit 0
+- `npm pack --dry-run`: plugin manifest + skills + commands + hooks present
