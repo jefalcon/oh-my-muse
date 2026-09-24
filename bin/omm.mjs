@@ -19,6 +19,8 @@ import {
   loadModelsFile,
   getPreset,
   applyPreset,
+  applyModelOverrides,
+  validateModelOverrides,
   validateConfig,
   loadProjectConfig,
   readManifest,
@@ -50,6 +52,9 @@ Commands:
 
 Global options: --dir <path>  Target project dir (default: cwd). Paths are absolute.
 Env: OMM_DIR overrides --dir. Secrets in output are redacted; webhooks must be https.
+File-channel notes land inside --dir unless the project config sets
+allowExternalNotificationFile=true (or OMM_ALLOW_EXTERNAL_NOTIFY_FILE=1);
+an explicit notify --file <path> always opts out.
 `;
 
 function parseArgs(argv) {
@@ -134,12 +139,16 @@ function cmdList(args) {
   const { config, file } = loadProjectConfig(target);
   if (!config) fail(`No config at ${file}; run: omm setup --dir ${target}`);
   const defTier = config.defaultTier ?? "balanced";
-  const agents = (config.agents ?? []).map((a) => ({
-    name: a.name,
-    tier: a.tier ?? defTier,
-    model: a.model ?? (isTier(a.tier ?? defTier) ? TIER_MODELS[a.tier ?? defTier] : "(invalid tier)"),
-    description: a.description ?? "",
-  }));
+  const overrides = validateModelOverrides(config);
+  const agents = (config.agents ?? []).map((raw) => {
+    const a = applyModelOverrides(raw, overrides);
+    return {
+      name: a.name,
+      tier: a.tier ?? defTier,
+      model: a.model ?? (isTier(a.tier ?? defTier) ? TIER_MODELS[a.tier ?? defTier] : "(invalid tier)"),
+      description: a.description ?? "",
+    };
+  });
   if (args.json) {
     console.log(JSON.stringify(redactConfig(agents), null, 2));
     return;
@@ -160,7 +169,7 @@ function cmdPreset(args) {
     const agentName = String(args.apply);
     const idx = (config.agents ?? []).findIndex((a) => a.name === agentName);
     if (idx === -1) fail(`Agent "${agentName}" not found in ${file}`);
-    config.agents[idx] = applyPreset(config.agents[idx], preset);
+    config.agents[idx] = applyModelOverrides(applyPreset(config.agents[idx], preset), validateModelOverrides(config));
     validateConfig(expandEnv(config));
     const raw = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
     void raw;
@@ -238,7 +247,13 @@ function cmdSkill(args) {
   const repoSkills = path.join(REPO_ROOT, "pack", "skills");
   const dir = fs.existsSync(skillsDir) ? skillsDir : repoSkills;
   if (!fs.existsSync(dir)) fail(`No skills found under ${dir}`);
-  const names = fs.readdirSync(dir).filter((n) => fs.statSync(path.join(dir, n)).isDirectory()).sort();
+  const names = fs.readdirSync(dir).filter((n) => {
+    try {
+      return fs.lstatSync(path.join(dir, n)).isDirectory();
+    } catch {
+      return false;
+    }
+  }).sort();
   for (const n of names) console.log(n);
 }
 
@@ -255,8 +270,15 @@ async function cmdNotify(args) {
   if (args.webhookUrl) hook.webhookUrl = String(args.webhookUrl);
   if (args.botToken) hook.botToken = String(args.botToken);
   if (args.chatId) hook.chatId = String(args.chatId);
-  if (args.file) hook.file = String(args.file);
-  await sendNotification({ channel, message, projectName: args.project, vars: {}, hook });
+  // An explicit --file flag is the user's own action and opts out of project
+  // confinement. A config-driven path stays confined unless the config opts
+  // in via allowExternalNotificationFile (or OMM_ALLOW_EXTERNAL_NOTIFY_FILE=1).
+  const explicitFile = args.file ? String(args.file) : null;
+  if (explicitFile) hook.file = explicitFile;
+  const allowExternalFile = explicitFile !== null
+    || config?.allowExternalNotificationFile === true
+    || process.env.OMM_ALLOW_EXTERNAL_NOTIFY_FILE === "1";
+  await sendNotification({ channel, message, projectName: args.project, vars: {}, hook, root: target, allowExternalFile });
   console.log(`Notified via ${channel}.`);
 }
 

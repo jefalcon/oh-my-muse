@@ -137,6 +137,8 @@ export function redactText(text) {
   return String(text)
     .replace(/(bot\d+:[A-Za-z0-9_-]{10,})/g, "[redacted]")
     .replace(/(xox[bpas]-[A-Za-z0-9-]{8,})/g, "[redacted]")
+    .replace(/https?:\/\/(?:www\.|m\.)?(?:discord\.com|discordapp\.com)\/api\/webhooks\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+/g, "[redacted-discord-webhook]")
+    .replace(/https?:\/\/hooks\.slack(?:-gov)?\.com\/services\/[A-Za-z0-9]+\/[A-Za-z0-9]+\/[A-Za-z0-9]+/g, "[redacted-slack-webhook]")
     .replace(/(-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----)/g, "[redacted]");
 }
 
@@ -149,6 +151,74 @@ export function assertHttps(urlStr, label = "webhook") {
   }
   if (u.protocol !== "https:") throw new Error(`${label} URL must use https:, got ${u.protocol}`);
   return u.toString();
+}
+
+function isInside(root, candidate) {
+  const rel = path.relative(path.resolve(root), path.resolve(candidate));
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/** Resolve a notification file and keep it inside the project root unless opted out. */
+export function resolveNotificationFile(root, configured, allowExternal = false) {
+  const target = path.resolve(path.resolve(root), String(configured));
+  if (!allowExternal && !isInside(root, target)) {
+    throw new Error("refusing notification file outside project root (set allowExternalNotificationFile=true to opt in)");
+  }
+  // If the target (or an existing parent) goes through a symlink, verify its
+  // real path as well so a path that is lexically inside the project cannot
+  // escape through a symlinked directory.
+  if (!allowExternal) {
+    const rootReal = fs.realpathSync(path.resolve(root));
+    let probe = fs.existsSync(target) ? target : path.dirname(target);
+    while (!fs.existsSync(probe)) {
+      const parent = path.dirname(probe);
+      if (parent === probe) break;
+      probe = parent;
+    }
+    if (fs.existsSync(probe)) {
+      const real = fs.realpathSync(probe);
+      if (!isInside(rootReal, real)) {
+        throw new Error("refusing notification file through a symlink outside project root");
+      }
+    }
+  }
+  return target;
+}
+
+/** Validate literal/resolved Slack and Discord webhook destinations. */
+export function validateWebhookUrl(channel, raw) {
+  let url;
+  try {
+    url = new URL(String(raw));
+  } catch {
+    throw new Error(`invalid ${channel} webhook URL`);
+  }
+  if (url.protocol !== "https:") throw new Error(`${channel} webhook must use https`);
+  if (channel === "slack") {
+    const hosts = new Set(["hooks.slack.com", "hooks.slack-gov.com"]);
+    if (!hosts.has(url.hostname) || !url.pathname.startsWith("/services/")) {
+      throw new Error("slack webhook must use hooks.slack.com (or hooks.slack-gov.com) /services/...");
+    }
+  } else if (channel === "discord") {
+    const hosts = new Set(["discord.com", "www.discord.com", "discordapp.com", "www.discordapp.com"]);
+    if (!hosts.has(url.hostname) || !url.pathname.startsWith("/api/webhooks/")) {
+      throw new Error("discord webhook must use a Discord /api/webhooks/... URL");
+    }
+  }
+  return url.toString();
+}
+
+export function validateNotifyHook(name, hook) {
+  if (!hook || typeof hook !== "object") throw new Error(`notify.${name} must be an object`);
+  if (hook.channel !== undefined && !["telegram", "discord", "slack", "file"].includes(hook.channel)) {
+    throw new Error(`notify.${name}.channel must be telegram|discord|slack|file`);
+  }
+  if (hook.url !== undefined) assertHttps(expandEnvInString(String(hook.url)), `notify.${name}`);
+  if (hook.webhookUrl !== undefined) {
+    const expanded = expandEnvInString(String(hook.webhookUrl));
+    if (hook.channel === "discord" || hook.channel === "slack") validateWebhookUrl(hook.channel, expanded);
+    else assertHttps(expanded, `notify.${name}`);
+  }
 }
 
 export function isTier(value) {
@@ -167,10 +237,68 @@ export function loadModelsFile(repoRoot) {
 }
 
 export function getPreset(models, name) {
-  const all = { ...(models.presets ?? {}), ...(models.customPresets ?? {}) };
-  const preset = all[name];
-  if (!preset) throw new Error(`Unknown preset "${name}". Available: ${Object.keys(all).join(", ") || "(none)"}`);
-  return preset;
+  return resolvePreset(models, name);
+}
+
+/**
+ * Resolve a preset by name. Builtin presets resolve as-is. Custom presets are
+ * partial overlays: without `extends` they inherit `{ tier: "balanced" }` (or
+ * the same-name builtin when overriding one); with `extends` they inherit the
+ * named builtin or custom preset. Inheritance cycles are rejected.
+ */
+export function resolvePreset(models, name, seen = new Set()) {
+  const builtins = models.presets ?? {};
+  const customs = models.customPresets ?? {};
+  const custom = customs[name];
+  if (!custom) {
+    const preset = builtins[name];
+    if (!preset) {
+      const all = [...Object.keys(builtins), ...Object.keys(customs)];
+      throw new Error(`Unknown preset "${name}". Available: ${all.join(", ") || "(none)"}`);
+    }
+    return { ...preset };
+  }
+  if (seen.has(name)) throw new Error(`custom preset inheritance cycle at "${name}"`);
+  seen.add(name);
+  let base;
+  if (custom.extends === undefined) {
+    base = builtins[name] ? { ...builtins[name] } : { tier: "balanced" };
+  } else if (customs[custom.extends]) {
+    base = resolvePreset(models, custom.extends, seen);
+  } else if (builtins[custom.extends]) {
+    base = { ...builtins[custom.extends] };
+  } else {
+    throw new Error(`custom preset extends unknown preset "${custom.extends}"`);
+  }
+  const { extends: _extends, ...own } = custom;
+  return { ...base, ...own };
+}
+
+/**
+ * Per-agent model pins from config `modelOverrides`. Every key must name a
+ * configured agent and every value must be a non-empty model id string.
+ * Overrides win over any preset when applied (see applyModelOverrides).
+ */
+export function validateModelOverrides(config) {
+  const overrides = config.modelOverrides;
+  if (overrides === undefined) return {};
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+    throw new Error("modelOverrides must be an object");
+  }
+  const names = new Set((config.agents ?? []).map((a) => a?.name));
+  const unknown = Object.keys(overrides).filter((k) => !names.has(k));
+  if (unknown.length > 0) throw new Error(`modelOverrides reference unknown agent(s): ${unknown.join(", ")}`);
+  const invalid = Object.entries(overrides).filter(([, v]) => typeof v !== "string" || v.length === 0);
+  if (invalid.length > 0) {
+    throw new Error(`modelOverrides contain missing/empty/non-string model id(s): ${invalid.map(([k]) => k).join(", ")}`);
+  }
+  return overrides;
+}
+
+export function applyModelOverrides(agent, overrides = {}) {
+  const pinned = overrides?.[agent.name];
+  if (pinned === undefined) return agent;
+  return { ...agent, model: pinned };
 }
 
 export function applyPreset(agent, preset) {
@@ -211,14 +339,12 @@ export function validateConfig(config) {
   const notify = config.notify;
   if (notify !== undefined) {
     if (!notify || typeof notify !== "object") throw new Error("notify must be an object");
-    for (const [name, hook] of Object.entries(notify)) {
-      if (!hook || typeof hook !== "object") throw new Error(`notify.${name} must be an object`);
-      if (hook.url !== undefined) assertHttps(expandEnvInString(String(hook.url)), `notify.${name}`);
-      if (hook.channel !== undefined && !["telegram", "discord", "slack", "file"].includes(hook.channel)) {
-        throw new Error(`notify.${name}.channel must be telegram|discord|slack|file`);
-      }
-    }
+    for (const [name, hook] of Object.entries(notify)) validateNotifyHook(name, hook);
   }
+  if (config.allowExternalNotificationFile !== undefined && typeof config.allowExternalNotificationFile !== "boolean") {
+    throw new Error("allowExternalNotificationFile must be a boolean");
+  }
+  validateModelOverrides(config);
   return { defaultTier: tier, agents };
 }
 
@@ -436,7 +562,7 @@ export function doctor({ repoRoot, targetDir }) {
   if (config?.notify) {
     for (const [name, hook] of Object.entries(config.notify)) {
       try {
-        if (hook.url) assertHttps(expandEnvInString(String(hook.url)), `notify.${name}`);
+        validateNotifyHook(name, hook);
         push(true, `notify.${name} webhook uses https or is unset`);
       } catch (err) {
         push(false, `notify.${name}: ${err.message}`);

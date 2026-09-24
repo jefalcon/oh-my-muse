@@ -2,11 +2,24 @@
   "name": "oh-my-muse",
   "version": "0.1.0",
   "description": "Token-efficient agent pack runner for Muse Spark",
+  "keywords": ["muse", "muse-spark", "agents", "orchestration", "codebuff"],
+  "author": "oh-my-muse contributors",
   "license": "MIT",
   "type": "module",
   "bin": {
     "omm": "./bin/omm.mjs"
   },
+  "files": [
+    "bin/",
+    "hooks/",
+    "pack/",
+    "src/",
+    "types/",
+    "models.json",
+    "omm.jsonc",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=20"
   },

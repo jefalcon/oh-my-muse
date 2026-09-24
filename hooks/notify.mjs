@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import https from "node:https";
-import { expandEnvInString, assertHttps, redactText } from "../bin/lib.mjs";
+import { expandEnvInString, assertHttps, redactText, resolveNotificationFile, validateWebhookUrl } from "../bin/lib.mjs";
 
 export const CHANNELS = ["telegram", "discord", "slack", "file"];
 
@@ -50,19 +50,17 @@ export async function sendTelegram({ botToken, chatId, text }) {
 }
 
 export async function sendDiscord({ webhookUrl, text }) {
-  const url = expandEnvInString(String(webhookUrl));
-  assertHttps(url, "discord webhook");
+  const url = validateWebhookUrl("discord", expandEnvInString(String(webhookUrl)));
   return postJson(url, { content: String(text).slice(0, 2000) });
 }
 
 export async function sendSlack({ webhookUrl, text }) {
-  const url = expandEnvInString(String(webhookUrl));
-  assertHttps(url, "slack webhook");
+  const url = validateWebhookUrl("slack", expandEnvInString(String(webhookUrl)));
   return postJson(url, { text: String(text) });
 }
 
-export async function sendFile({ file, text }) {
-  const dest = path.resolve(expandEnvInString(String(file)));
+export async function sendFile({ file, text, root = process.cwd(), allowExternalFile = false }) {
+  const dest = resolveNotificationFile(root, expandEnvInString(String(file)), allowExternalFile);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.appendFileSync(dest, `${new Date().toISOString()} ${String(text)}\n`);
   return { ok: true, file: dest };
@@ -77,7 +75,7 @@ export function baseVars({ projectName, extra = {} } = {}) {
   };
 }
 
-export async function sendNotification({ channel, message, projectName, vars = {}, hook = {} }) {
+export async function sendNotification({ channel, message, projectName, vars = {}, hook = {}, root = process.cwd(), allowExternalFile = false }) {
   if (!CHANNELS.includes(channel)) throw new Error(`Unknown channel "${channel}"; expected ${CHANNELS.join("|")}`);
   const text = renderTemplate(expandEnvInString(String(message ?? hook.text ?? "")), baseVars({ projectName, extra: vars }));
   if (!text) throw new Error("Notification message is empty after template rendering");
@@ -89,7 +87,7 @@ export async function sendNotification({ channel, message, projectName, vars = {
     case "slack":
       return sendSlack({ webhookUrl: hook.webhookUrl ?? hook.url ?? process.env.SLACK_WEBHOOK_URL ?? "", text });
     case "file":
-      return sendFile({ file: hook.file ?? process.env.OMM_NOTIFY_FILE ?? "omm-notify.log", text });
+      return sendFile({ file: hook.file ?? process.env.OMM_NOTIFY_FILE ?? "omm-notify.log", text, root, allowExternalFile });
     default:
       throw new Error(`Unhandled channel "${channel}"`);
   }
@@ -123,7 +121,9 @@ if (isMain) {
   if (args.file) hook.file = String(args.file);
   try {
     if (!channel) throw new Error("Usage: notify.mjs --channel telegram|discord|slack|file --message <text> [--url ...]");
-    const result = await sendNotification({ channel, message, projectName: args.project, vars: {}, hook });
+    // An explicit --file flag is the user's own action and opts out of root
+    // confinement; a config-driven path stays confined to the cwd project.
+    const result = await sendNotification({ channel, message, projectName: args.project, vars: {}, hook, root: process.cwd(), allowExternalFile: Boolean(args.file) });
     if (channel === "file") console.log(`Notified via file: ${result.file}`);
     else console.log(`Notified via ${channel}.`);
   } catch (err) {

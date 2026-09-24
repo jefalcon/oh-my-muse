@@ -31,6 +31,12 @@ import {
   configHasSecrets,
   gitignoreWarning,
   doctor,
+  resolveNotificationFile,
+  validateWebhookUrl,
+  validateNotifyHook,
+  resolvePreset,
+  validateModelOverrides,
+  applyModelOverrides,
 } from "../bin/lib.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -248,5 +254,151 @@ describe("doctor secret handling", () => {
   it("gitignoreWarning passes outside git and flags unignored secrets", () => {
     const [okOutside] = gitignoreWarning(makeTmp(), "/nope/omm.jsonc", true);
     assert.equal(okOutside, true);
+  });
+});
+
+describe("notification file confinement", () => {
+  it("allows files inside the project root", () => {
+    const root = makeTmp();
+    assert.equal(
+      resolveNotificationFile(root, "sub/notify.log"),
+      path.join(path.resolve(root), "sub", "notify.log"),
+    );
+  });
+
+  it("refuses files outside the root unless opted in", () => {
+    const root = makeTmp();
+    assert.throws(() => resolveNotificationFile(root, "/tmp/elsewhere.log"), /outside project root/);
+    assert.throws(() => resolveNotificationFile(root, "../escape.log"), /outside project root/);
+    assert.equal(
+      resolveNotificationFile(root, "/tmp/elsewhere.log", true),
+      path.resolve("/tmp/elsewhere.log"),
+    );
+  });
+
+  it("refuses lexical-inside paths that escape through a symlinked dir", () => {
+    const root = makeTmp();
+    const outside = makeTmp();
+    fs.symlinkSync(outside, path.join(root, "link"));
+    assert.throws(() => resolveNotificationFile(root, "link/notify.log"), /symlink/);
+    assert.equal(
+      resolveNotificationFile(root, "link/notify.log", true),
+      path.join(path.resolve(root), "link", "notify.log"),
+    );
+  });
+
+  it("sendFile confines config-driven paths but honors explicit opt-out", async () => {
+    const { sendFile } = await import("../hooks/notify.mjs");
+    const root = makeTmp();
+    const outside = path.join(makeTmp(), "ext.log");
+    await assert.rejects(
+      sendFile({ file: outside, text: "hi", root }),
+      /outside project root/,
+    );
+    const res = await sendFile({ file: outside, text: "hi", root, allowExternalFile: true });
+    assert.equal(res.ok, true);
+    assert.match(fs.readFileSync(outside, "utf8"), /hi/);
+    const inside = await sendFile({ file: "n.log", text: "in", root });
+    assert.match(fs.readFileSync(inside.file, "utf8"), /in/);
+  });
+});
+
+describe("webhook URL validation", () => {
+  it("validateWebhookUrl pins discord/slack to provider hosts over https", () => {
+    validateWebhookUrl("discord", "https://discord.com/api/webhooks/1/tok");
+    validateWebhookUrl("slack", "https://hooks.slack.com/services/A/B/C");
+    assert.throws(() => validateWebhookUrl("discord", "http://discord.com/api/webhooks/1/tok"), /https/);
+    assert.throws(() => validateWebhookUrl("discord", "https://evil.example/api/webhooks/1/tok"), /Discord/);
+    assert.throws(() => validateWebhookUrl("slack", "https://evil.example/services/A/B/C"), /slack webhook/);
+    assert.throws(() => validateWebhookUrl("discord", "not a url"), /invalid discord/);
+  });
+
+  it("validateConfig and doctor reject bad webhookUrl values", () => {
+    assert.throws(
+      () => validateConfig({ agents: [], notify: { d: { channel: "discord", webhookUrl: "https://evil.example/x" } } }),
+      /Discord/,
+    );
+    validateConfig({ agents: [], notify: { d: { channel: "discord", webhookUrl: "https://discord.com/api/webhooks/1/t" } } });
+    assert.throws(
+      () => validateConfig({ agents: [], allowExternalNotificationFile: "yes" }),
+      /allowExternalNotificationFile must be a boolean/,
+    );
+    const dir = makeTmp();
+    fs.writeFileSync(
+      path.join(dir, "omm.jsonc"),
+      `{"defaultTier":"balanced","agents":[],"notify":{"d":{"channel":"discord","webhookUrl":"https://evil.example/x"}}}\n`,
+    );
+    const repoRoot = repoRootFromHere(new URL("../bin/lib.mjs", import.meta.url).href);
+    const failed = doctor({ repoRoot, targetDir: dir }).filter((c) => !c.ok);
+    assert.ok(failed.some((c) => c.message.includes("notify.d")), "doctor must flag the bad webhook");
+  });
+
+  it("redactText scrubs discord and slack webhook URLs", () => {
+    const d = "hook https://discord.com/api/webhooks/123/abc-def here";
+    assert.ok(!redactText(d).includes("abc-def"), "discord token must not leak");
+    const s = "hook https://hooks.slack.com/services/T1/B2/xyz here";
+    assert.ok(!redactText(s).includes("xyz"), "slack token must not leak");
+  });
+
+  it("validateNotifyHook rejects non-object hooks", () => {
+    assert.throws(() => validateNotifyHook("h", null), /must be an object/);
+  });
+});
+
+describe("preset inheritance and model overrides", () => {
+  const models = {
+    presets: { code: { tier: "balanced", temperature: 0.2 } },
+    customPresets: {
+      mine: { temperature: 0.9 },
+      child: { extends: "mine", maxTokens: 100 },
+    },
+  };
+
+  it("custom presets inherit balanced by default and builtins resolve as-is", () => {
+    assert.deepEqual(resolvePreset(models, "code"), { tier: "balanced", temperature: 0.2 });
+    assert.deepEqual(resolvePreset(models, "mine"), { tier: "balanced", temperature: 0.9 });
+  });
+
+  it("extends chains custom and builtin bases, own fields win", () => {
+    assert.deepEqual(resolvePreset(models, "child"), { tier: "balanced", temperature: 0.9, maxTokens: 100 });
+    const withBase = resolvePreset(
+      { presets: { code: { tier: "balanced" } }, customPresets: { c: { extends: "code", temperature: 0.1 } } },
+      "c",
+    );
+    assert.deepEqual(withBase, { tier: "balanced", temperature: 0.1 });
+  });
+
+  it("rejects unknown presets, unknown bases, and cycles", () => {
+    assert.throws(() => resolvePreset(models, "nope"), /Unknown preset/);
+    assert.throws(
+      () => resolvePreset({ presets: {}, customPresets: { c: { extends: "ghost" } } }, "c"),
+      /extends unknown preset/,
+    );
+    assert.throws(
+      () => resolvePreset({ presets: {}, customPresets: { a: { extends: "b" }, b: { extends: "a" } } }, "a"),
+      /cycle/,
+    );
+  });
+
+  it("modelOverrides must name configured agents with non-empty model ids", () => {
+    const config = { agents: [{ name: "a", systemPrompt: "s" }] };
+    assert.deepEqual(validateModelOverrides(config), {});
+    assert.deepEqual(validateModelOverrides({ ...config, modelOverrides: { a: "m-x" } }), { a: "m-x" });
+    assert.throws(
+      () => validateModelOverrides({ ...config, modelOverrides: { ghost: "m" } }),
+      /unknown agent/,
+    );
+    assert.throws(
+      () => validateModelOverrides({ ...config, modelOverrides: { a: "" } }),
+      /model id/,
+    );
+    assert.throws(() => validateModelOverrides({ ...config, modelOverrides: ["a"] }), /must be an object/);
+  });
+
+  it("overrides win over presets when applied", () => {
+    const agent = applyPreset({ name: "a", systemPrompt: "s" }, { tier: "budget" });
+    assert.equal(agent.model, TIER_MODELS.budget);
+    assert.equal(applyModelOverrides(agent, { a: "pinned-model" }).model, "pinned-model");
+    assert.equal(applyModelOverrides(agent, {}).model, TIER_MODELS.budget);
   });
 });

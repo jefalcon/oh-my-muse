@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import {
   CONFIG_MODE,
   installDirFor,
+  loadJsoncFile,
   loadProjectConfig,
   installPack,
   updatePack,
@@ -138,5 +139,38 @@ describe("omm CLI end to end", () => {
     runCli(["install", "--dir", target], REPO_ROOT);
     const out = runCli(["skill", "list", "--dir", target], REPO_ROOT);
     assert.match(out, /verify|tdd|security/);
+  });
+
+  it("config-driven notify file outside the project is refused without opt-in", () => {
+    const target = makeTmp();
+    runCli(["setup", "--dir", target], REPO_ROOT);
+    const outside = path.join(makeTmp(), "outside.log");
+    runCli(["config", "set", "notify.ext.channel", "file", "--dir", target], REPO_ROOT);
+    runCli(["config", "set", "notify.ext.file", outside, "--dir", target], REPO_ROOT);
+    assert.throws(
+      () => runCli(["notify", "--channel", "file", "--message", "nope", "--hook", "ext", "--dir", target], REPO_ROOT),
+      /outside project root/,
+    );
+    assert.equal(fs.existsSync(outside), false);
+    runCli(["config", "set", "allowExternalNotificationFile", "true", "--dir", target], REPO_ROOT);
+    const out = runCli(["notify", "--channel", "file", "--message", "opted in", "--hook", "ext", "--dir", target], REPO_ROOT);
+    assert.match(out, /Notified via file/);
+    assert.match(fs.readFileSync(outside, "utf8"), /opted in/);
+  });
+
+  it("modelOverrides pin survives preset application", () => {
+    const target = makeTmp();
+    runCli(["setup", "--dir", target], REPO_ROOT);
+    const cfgFile = path.join(installDirFor(target), "omm.jsonc");
+    const cfg = loadJsoncFile(cfgFile);
+    cfg.agents = [{ name: "pinned", systemPrompt: "s", tier: "budget" }];
+    cfg.modelOverrides = { pinned: "custom-model-1" };
+    fs.writeFileSync(cfgFile, `${JSON.stringify(cfg, null, 2)}\n`);
+    const listOut = runCli(["list", "--dir", target, "--json"], REPO_ROOT);
+    const agents = JSON.parse(listOut);
+    assert.equal(agents.find((a) => a.name === "pinned").model, "custom-model-1");
+    runCli(["preset", "code", "--apply", "pinned", "--dir", target], REPO_ROOT);
+    const listOut2 = runCli(["list", "--dir", target, "--json"], REPO_ROOT);
+    assert.equal(JSON.parse(listOut2).find((a) => a.name === "pinned").model, "custom-model-1");
   });
 });

@@ -56,3 +56,23 @@ except for the project-local `omm.jsonc`.
   installed revision.
 - `omm.jsonc` is intentionally divergent per project and is excluded
   from parity.
+
+## Upstream provenance (oh-my-freebuff)
+
+This pack is adapted from `oh-my-freebuff` (MIT), retargeted at Muse
+Spark. It is not a fork kept in sync: names are renamed (`omf-*` ->
+`muse-*`, `omf.jsonc` -> `omm.jsonc`, `.freebuff` -> `.claude/oh-my-muse`)
+and the model/routing layer is replaced (OpenRouter tiers ->
+`muse-spark-fast` / `muse-spark` / `muse-spark-reasoning`).
+
+Live diff against upstream `main`, verified 2026-09-24:
+
+| Upstream | oh-my-muse | Status |
+|---|---|---|
+| 26 agents (9 orchestrators + 14 specialists + advisor-a/b/c panel) | 23 agents; advisor-a/b/c consolidated into `muse-advisor` | Intentional adaptation |
+| `resolveNotificationFile` root confinement + symlink realpath check + `allowExternalNotificationFile` opt-in | Ported to `bin/lib.mjs` (same messages) | Parity restored (audit fix) |
+| `validateWebhookUrl` slack/discord host allowlists | Ported to `bin/lib.mjs`, enforced in config validation, doctor, and send-time | Parity restored (audit fix) |
+| Custom preset `extends` + inheritance-cycle error + `modelOverrides` (unknown-agent / empty-model rejection, overrides win) | Ported to `bin/lib.mjs` (`resolvePreset`, `validateModelOverrides`, `applyModelOverrides`); default base is `{ tier: "balanced" }` | Parity restored (audit fix) |
+| `--global`/`--force`/`--show-secrets`, user `<` project config scopes, colored CLI output | Not ported; single project scope, secrets always redacted | Intentional simplification (gap if upstream UX is wanted) |
+| `agents.manifest.json`, `templates/`, multi-skill `skills/` dir | Not ported; 6 built-in skills under `pack/skills/` | Intentional simplification |
+| `package-lock.json` committed | Added during audit (CI `npm ci` requires it) | Parity restored (audit fix) |
