@@ -1,6 +1,6 @@
 # oh-my-muse
 
-[![CI](https://github.com/javi/oh-my-muse/actions/workflows/ci.yml/badge.svg)](https://github.com/javi/oh-my-muse/actions/workflows/ci.yml)
+[![CI](https://github.com/jefalcon/oh-my-muse/actions/workflows/ci.yml/badge.svg)](https://github.com/jefalcon/oh-my-muse/actions/workflows/ci.yml)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![ESM](https://img.shields.io/badge/modules-ESM-yellow)](package.json)
@@ -14,7 +14,7 @@ and redacted secrets.
 Requires Node.js `>= 20` (ES modules).
 
 ```sh
-git clone https://github.com/javi/oh-my-muse.git
+git clone https://github.com/jefalcon/oh-my-muse.git
 cd oh-my-muse
 node bin/omm.mjs --help
 ```

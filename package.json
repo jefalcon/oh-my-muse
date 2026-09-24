@@ -12,11 +12,11 @@
   "author": "Javi",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/javi/oh-my-muse.git"
+    "url": "git+https://github.com/jefalcon/oh-my-muse.git"
   },
-  "homepage": "https://github.com/javi/oh-my-muse#readme",
+  "homepage": "https://github.com/jefalcon/oh-my-muse#readme",
   "bugs": {
-    "url": "https://github.com/javi/oh-my-muse/issues"
+    "url": "https://github.com/jefalcon/oh-my-muse/issues"
   },
   "license": "MIT",
   "type": "module",

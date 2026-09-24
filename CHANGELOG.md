@@ -38,5 +38,5 @@ All notable changes to this project are documented here. Format follows
 - M4: `redactText` scrubs discord/slack webhook URLs.
 - L1: `skill list` no longer follows symlinks. L2: `.gitignore` covers
   `.claude/`. L3: `package.json` publish metadata (keywords, files).
-- Publish metadata: real repo URL (`github.com/javi/oh-my-muse`),
+- Publish metadata: real repo URL (`github.com/jefalcon/oh-my-muse`),
   `repository`/`homepage`/`bugs`, LICENSE upstream attributions.
