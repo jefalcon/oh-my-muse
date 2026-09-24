@@ -3,6 +3,41 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.1] - 2026-09-24
+
+### Fixed
+
+- The 7 orchestrator commands (`omm-team`, `omm-autopilot`,
+  `omm-ultrawork`, `omm-pipeline`, `omm-ultraqa`, `omm-ralph`,
+  `omm-advisor`) now order real orchestration: in 0.2.0 `/omm-team`
+  ran with no Workflow at all (no `subagent/` folder in the session;
+  only `read_skill`, `write_file`, `edit_file` and `bash` on the main
+  thread). Commands are now imperative ("DEBES"), start with
+  `read_skill bundled:workflow-authoring`, forbid main-thread
+  implementation except final integration, and stop explicitly when
+  the Workflow tool is unavailable.
+
+### Changed
+
+- One Workflow call per wave (never a single workflow for everything)
+  so the parent narrates between waves; user-visible progress
+  contract (plan before launching, per-child role + findings + files
+  + `unresolved` plus gate decision after each wave, final report);
+  every child `input` starts with "Primero llama a read_skill
+  plugin:oh-my-muse:\<rol\>." with the `complete`/`evidence`/`unresolved`
+  schema within the 4096-byte UTF-8 limit. Each orchestrator keeps its
+  own pattern as explicit waves.
+- New `docs/SMOKE-ORCHESTRATION.md`: manual check that a command
+  orchestrated (session `subagent/` folder, subagent count,
+  per-role `read_skill`). Not automated in CI.
+- `docs/OPEN-QUESTIONS.md` O4 resolved: a Stop hook reached
+  api.telegram.org and discord.com (HTTP 200) with the sandbox active.
+- `--message` help clarifies `$ENV` expands only from the CLI, never
+  from the hook (Muse filters hook env).
+- New static test `test/orchestration.test.mjs` (registered in
+  `npm test`) asserting the orchestration contract markers in all 7
+  commands.
+
 ## [0.2.0] - 2026-09-24
 
 ### **BREAKING**

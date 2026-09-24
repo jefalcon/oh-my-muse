@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "oh-my-muse",
   "displayName": "Oh My Muse",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Specialist skills and orchestrator commands for Muse Code, with turn-end notifications.",
   "compat": {
     "source": "native",

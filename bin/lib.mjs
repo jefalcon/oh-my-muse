@@ -258,7 +258,7 @@ export const NOTIFY_SETUP_OPTIONS = [
     name: "message",
     aliases: ["text"],
     value: "<text>",
-    desc: "Default message template (supports {{projectName}} {{event}} {{date}} and $ENV).",
+    desc: "Default message template (supports {{projectName}} {{event}} {{date}} and $ENV; $ENV expands only from the CLI, never from the hook — Muse filters hook env).",
     channels: ["telegram", "discord", "slack", "file"],
     required: false,
     secret: false,

@@ -1,6 +1,6 @@
 {
   "name": "oh-my-muse",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Native Muse Code plugin: specialist skills, orchestrator commands, and turn-end notifications",
   "keywords": [
     "muse",
@@ -34,6 +34,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/cli.test.mjs test/e2e.test.mjs test/validators.test.mjs test/tarball.test.mjs test/notify-config.test.mjs"
+    "test": "node --test test/cli.test.mjs test/e2e.test.mjs test/validators.test.mjs test/tarball.test.mjs test/notify-config.test.mjs test/orchestration.test.mjs"
   }
 }

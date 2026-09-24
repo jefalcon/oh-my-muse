@@ -77,13 +77,16 @@ workspace root and stdin JSON carries `cwd`, `hook_event_name`
 0 after redacted stderr diagnostics), and caps its own runtime well
 under `timeoutMs`.
 
-### O4 — Do webhooks leave the hook network sandbox?
+### O4 — Do webhooks leave the hook network sandbox? (Resolved 2026-09-24)
 
-`telegram`/`discord`/`slack` delivery from inside a hook is untested
-end to end: pending verification whether the hook network sandbox lets
-those POSTs out. The `file` channel works without network. Verify with
-`omm notify setup --channel discord ...` + `omm notify test` (CLI, full
-env) versus a real `Stop` firing, comparing arrivals.
+2026-09-24: un hook Stop alcanzó api.telegram.org y discord.com (HTTP
+200) con el sandbox activo. Los webhooks sí salen del sandbox de red
+del hook.
+
+(Resto del contexto original: el canal `file` funciona sin red. Se
+verificó con `omm notify setup --channel discord ...` + `omm notify
+test` (CLI, entorno completo) frente a un `Stop` real, comparando
+llegadas.)
 
 ### O2 — Command frontmatter beyond `description`/`argument-hint`
 
