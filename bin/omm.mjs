@@ -11,7 +11,16 @@ import {
   installArgs,
   redactText,
 } from "./lib.mjs";
-import { sendNotification, CHANNELS } from "../plugin/hooks/notify.mjs";
+import fs from "node:fs";
+import {
+  sendNotification,
+  CHANNELS,
+  notifyConfigPath,
+  readNotifyConfigFile,
+  applyEnvOverrides,
+  writeNotifyConfig,
+  isSecureConfigMode,
+} from "../plugin/hooks/notify.mjs";
 
 const PLUGIN_DIR = pluginDirFromHere(import.meta.url);
 
@@ -23,15 +32,24 @@ Commands:
   install [--scope user|project]  Install the plugin into Muse (prints the pending approve step)
   uninstall                       Remove ${PLUGIN_ID} from Muse
   validate                        Run both real validators (skills, then plugin)
-  doctor                          Check node, muse in PATH, muse version, validation
+  doctor                          Check node, muse in PATH, muse version, validation, notify config
+  notify setup --channel <c> [...]  Write $HOME/.config/oh-my-muse/notify.json (mode 0600)
+  notify test [--message <m>]     Send a notification using the config file
   notify --channel <c> --message <m>
                                   Send a notification (telegram|discord|slack|file)
 
-Env: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL,
-SLACK_WEBHOOK_URL, OMM_NOTIFY_FILE. Secrets in output are redacted;
-webhooks must be https (discord/slack host allowlists enforced).
-File-channel notes land inside the cwd unless OMM_NOTIFY_ALLOW_EXTERNAL=1;
-an explicit notify --file <path> always opts out.
+Config file ($HOME/.config/oh-my-muse/notify.json; XDG_CONFIG_HOME is NOT
+used): channel, webhookUrl, botToken, chatId, file, message,
+allowExternalFile, includeAssistantMessage. Secrets live only there and
+are never printed. For CLI use, OMM_* variables override the file; the
+Stop hook reads ONLY the file (Muse filters hook env, and Stop fires at
+the end of every turn).
+Env: OMM_NOTIFY_CHANNEL, OMM_NOTIFY_MESSAGE, OMM_NOTIFY_FILE,
+OMM_NOTIFY_ALLOW_EXTERNAL=1, OMM_NOTIFY_WEBHOOK_URL, TELEGRAM_BOT_TOKEN /
+TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, SLACK_WEBHOOK_URL. Secrets in
+output are redacted; webhooks must be https (discord/slack host
+allowlists enforced). File-channel notes land inside the cwd unless
+allowed externally; an explicit notify --file <path> always opts out.
 `;
 
 function parseArgs(argv) {
@@ -101,25 +119,115 @@ function cmdDoctor() {
       check(false, `validation: ${err.message}`);
     }
   }
+  // Notify config file: existence, permissions, channel. Never print secrets.
+  try {
+    const cfgPath = notifyConfigPath();
+    if (!fs.existsSync(cfgPath)) {
+      console.log("ok   notify config: not configured (hook is silent)");
+    } else {
+      const mode = fs.statSync(cfgPath).mode & 0o777;
+      if (!isSecureConfigMode(mode)) {
+        check(false, `notify config is group/other-readable (mode ${mode.toString(8)}): run chmod 600 ${cfgPath}`);
+      } else {
+        const cfg = readNotifyConfigFile(cfgPath);
+        const channel = String(cfg.channel ?? "(unset)");
+        check(true, `notify config: ${cfgPath} (mode ${mode.toString(8)}, channel=${channel})`);
+      }
+    }
+  } catch (err) {
+    check(false, `notify config: ${redactText(err?.message ?? String(err))}`);
+  }
   if (failed > 0) process.exit(1);
 }
 
-async function cmdNotify(args) {
+function truthyFlag(value) {
+  if (value === undefined) return undefined;
+  const s = String(value).toLowerCase();
+  return !(s === "false" || s === "0" || s === "no");
+}
+
+async function cmdNotifySetup(args) {
   const channel = String(args.channel ?? args._[1] ?? "");
-  const message = String(args.message ?? args.text ?? args._[2] ?? "");
+  if (!CHANNELS.includes(channel)) fail(`Usage: omm notify setup --channel ${CHANNELS.join("|")} [options]`);
+  const config = { channel };
+  const webhookUrl = args.webhookUrl ?? args["webhook-url"] ?? args.url;
+  if (webhookUrl !== undefined) config.webhookUrl = String(webhookUrl);
+  const botToken = args.botToken ?? args["bot-token"];
+  if (botToken !== undefined) config.botToken = String(botToken);
+  const chatId = args.chatId ?? args["chat-id"];
+  if (chatId !== undefined) config.chatId = String(chatId);
+  if (args.file !== undefined) config.file = String(args.file);
+  const message = args.message ?? args.text;
+  if (message !== undefined) config.message = String(message);
+  const allowExternal = truthyFlag(args.allowExternalFile ?? args["allow-external-file"]);
+  if (allowExternal !== undefined) config.allowExternalFile = allowExternal;
+  const includeAssistant = truthyFlag(
+    args.includeAssistantMessage ?? args["include-assistant-message"] ?? args.includeAssistant,
+  );
+  if (includeAssistant !== undefined) config.includeAssistantMessage = includeAssistant;
+  const file = writeNotifyConfig(config);
+  // NEVER print secrets: only the path, mode, and non-secret channel.
+  console.log(`Wrote ${file} (mode 600, channel=${channel}).`);
+}
+
+async function cmdNotifyTest(args) {
+  const fileCfg = readNotifyConfigFile(notifyConfigPath());
+  const cfg = applyEnvOverrides(fileCfg);
+  const channel = String(cfg.channel ?? "");
+  if (!CHANNELS.includes(channel)) fail("notify test: no channel configured (run: omm notify setup --channel <c>)");
+  const message = args.message ?? args.text ?? cfg.message ?? "oh-my-muse: test notification";
+  const hook = {
+    webhookUrl: cfg.webhookUrl ?? args.webhookUrl ?? args.url,
+    url: cfg.webhookUrl ?? args.webhookUrl ?? args.url,
+    botToken: cfg.botToken ?? args.botToken,
+    chatId: cfg.chatId ?? args.chatId,
+    file: args.file ?? cfg.file,
+  };
+  const allowExternalFile = args.file !== undefined
+    ? true
+    : (cfg.allowExternalFile === true || process.env.OMM_NOTIFY_ALLOW_EXTERNAL === "1");
+  const result = await sendNotification({
+    channel,
+    message: String(message),
+    projectName: args.project,
+    vars: {},
+    hook,
+    root: process.cwd(),
+    allowExternalFile,
+  });
+  if (channel === "file") console.log(`Notified via file: ${result.file}`);
+  else console.log(`Notified via ${channel}.`);
+}
+
+async function cmdNotify(args) {
+  const sub = String(args._[1] ?? "");
+  if (sub === "setup") return cmdNotifySetup({ ...args, _: [args._[0], ...args._.slice(2)] });
+  if (sub === "test") return cmdNotifyTest({ ...args, _: [args._[0], ...args._.slice(2)] });
+  // Direct send (kept for on-demand use): CLI flags win, then OMM_* env,
+  // then the config file.
+  const fileCfg = readNotifyConfigFile(notifyConfigPath());
+  const cfg = applyEnvOverrides(fileCfg);
+  const channel = String(args.channel ?? cfg.channel ?? args._[1] ?? "");
+  const message = String(args.message ?? args.text ?? cfg.message ?? args._[2] ?? "");
   if (!CHANNELS.includes(channel)) fail(`Usage: omm notify --channel ${CHANNELS.join("|")} --message <text>`);
   if (!message) fail("notify requires --message <text>");
   const hook = {};
   if (args.url) hook.url = String(args.url);
   if (args.webhookUrl) hook.webhookUrl = String(args.webhookUrl);
+  else if (cfg.webhookUrl) hook.webhookUrl = cfg.webhookUrl;
   if (args.botToken) hook.botToken = String(args.botToken);
+  else if (cfg.botToken) hook.botToken = cfg.botToken;
   if (args.chatId) hook.chatId = String(args.chatId);
+  else if (cfg.chatId) hook.chatId = cfg.chatId;
   // An explicit --file flag is the user's own action and opts out of root
   // confinement; an env-driven path stays confined unless explicitly allowed.
   const explicitFile = args.file ? String(args.file) : null;
   if (explicitFile) hook.file = explicitFile;
   else if (process.env.OMM_NOTIFY_FILE) hook.file = process.env.OMM_NOTIFY_FILE;
-  const allowExternalFile = explicitFile !== null || process.env.OMM_NOTIFY_ALLOW_EXTERNAL === "1";
+  else if (cfg.file) hook.file = cfg.file;
+  const allowExternalFile = explicitFile !== null
+    || process.env.OMM_NOTIFY_ALLOW_EXTERNAL === "1"
+    || cfg.allowExternalFile === true;
   const result = await sendNotification({
     channel,
     message,

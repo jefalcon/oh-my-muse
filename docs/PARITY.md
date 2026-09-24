@@ -39,12 +39,12 @@ a named 0.2.0 successor, and every removal is recorded with its reason.
 | skill `security`               | `skills/security/SKILL.md`           | Ported                     |
 | skill `tdd`                    | —                                    | Removed: overlaps `durable-test-collateral` in muse-core |
 | skill `design`                 | —                                    | Removed: overlaps `taste` in muse-core |
-| `hooks/notify.mjs` (CLI-driven)| `plugin/hooks/notify{,-stop,-end}.mjs` | Ported, self-contained (node builtins only); allowlist, redaction, and file confinement preserved verbatim |
+| `hooks/notify.mjs` (CLI-driven)| `plugin/hooks/notify.mjs` (single `omm-notify-stop` on `Stop`) | Ported, self-contained (node builtins only); allowlist, redaction, and file confinement preserved; Fase 5: config file `$HOME/.config/oh-my-muse/notify.json`, `SessionEnd` hook removed |
 | tiers / presets / `models.json` / OpenRouter | —                         | Removed: the model is per session; tier driver deferred |
 | `omm setup/install/update` (file staging) | `omm install` → `muse plugins install` | Replaced by the native installer |
 | `omm list/preset/config/skill` | —                                    | Removed with the config layer |
 | `omm doctor`                   | `omm doctor` (node, muse, validation) | Replaced                 |
-| `omm notify`                   | `omm notify` (args + env, no project config) | Kept, simplified   |
+| `omm notify`                   | `omm notify` (args + env + `$HOME/.config/oh-my-muse/notify.json`; `setup`/`test` subcommands) | Kept, extended (Fase 5) |
 
 Dropped agent fields with no native equivalent: `tier`, `model`,
 `tools`, `maxTokens`, `temperature`. The session model and the

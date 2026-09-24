@@ -2,31 +2,95 @@
  * oh-my-muse notify hook (self-contained: node builtins only).
  *
  * Invoked by the runtime as `["node", "hooks/notify.mjs"]` on the `Stop`
- * (end of turn) and `SessionEnd` (end of session) events. The hook payload
- * shape is not documented, so stdin is read leniently: any JSON, empty
- * input, or unreadable stdin still yields a generic notification.
+ * (end of turn) event. `Stop` fires at the end of EVERY turn, including
+ * under `muse exec`.
  *
- * Configuration is env-only (hook argv is fixed):
- *   OMM_NOTIFY_CHANNEL=telegram|discord|slack|file   (unset/empty/off = silent no-op)
- *   OMM_NOTIFY_MESSAGE="optional {{projectName}} {{event}} {{date}} template"
- *   TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
- *   DISCORD_WEBHOOK_URL / SLACK_WEBHOOK_URL           (https + host allowlist enforced)
- *   OMM_NOTIFY_FILE=omm-notify.log                   (confined to cwd unless OPT-IN below)
- *   OMM_NOTIFY_ALLOW_EXTERNAL=1                       (opt out of root confinement)
- *   OMM_PROJECT=<name>                               (defaults to cwd basename)
+ * The runtime filters the hook environment: only a fixed allowlist
+ * (HOME, LANG, PATH, ...) reaches the hook, so NO OMM_* variable and no
+ * XDG_CONFIG_HOME is visible here. Configuration therefore lives in a
+ * fixed file, resolved via os.homedir() (never XDG_CONFIG_HOME):
  *
- * Security preserved from the CLI notifier: https-only webhooks with the
- * discord/slack host allowlists, secret redaction on every diagnostic, and
- * file-channel confinement to the project root (lexical + symlink realpath
- * check). The hook NEVER fails the turn: all errors are redacted to stderr
- * and the process exits 0.
+ *   $HOME/.config/oh-my-muse/notify.json
+ *
+ * Fields: channel (telegram|discord|slack|file|off), webhookUrl,
+ * botToken, chatId, file, message, allowExternalFile,
+ * includeAssistantMessage (bool, default false). Secrets live only here.
+ *
+ * Security, preserved from the CLI notifier: https-only webhooks with the
+ * discord/slack host allowlists, secret redaction on every diagnostic,
+ * and file-channel confinement to the payload `cwd` project root
+ * (lexical + symlink realpath check). A config file readable beyond its
+ * owner (mode & 0o077) is refused: the hook sends nothing. Input that is
+ * not a JSON object on stdin is also a silent no-op. The hook NEVER
+ * fails the turn: all errors are redacted to stderr and the process
+ * always exits 0.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import https from "node:https";
 
-export const CHANNELS = ["telegram", "discord", "slack", "file"];
-export const EVENTS = ["Stop", "SessionEnd"];
+export const CHANNELS = ["telegram", "discord", "slack", "file", "off"];
+export const HOOK_EVENT = "Stop";
+
+/** Fixed config location. Uses os.homedir(); XDG_CONFIG_HOME is ignored. */
+export function notifyConfigPath(home = os.homedir()) {
+  return path.join(home, ".config", "oh-my-muse", "notify.json");
+}
+
+export function notifyConfigDir(home = os.homedir()) {
+  return path.dirname(notifyConfigPath(home));
+}
+
+/** True when no group/other permission bit is set (0600, 0400, ...). */
+export function isSecureConfigMode(mode) {
+  return (Number(mode) & 0o077) === 0;
+}
+
+/** Read and parse the config file. Returns {} when missing/unreadable. Throws nothing. */
+export function readNotifyConfigFile(configPath = notifyConfigPath()) {
+  try {
+    const raw = fs.readFileSync(configPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Env overrides for CLI use only (`omm notify`). The hook never calls
+ * this: it reads the file and ignores the environment.
+ */
+export function applyEnvOverrides(fileCfg = {}, env = process.env) {
+  const out = { ...(fileCfg ?? {}) };
+  if (env.OMM_NOTIFY_CHANNEL) out.channel = env.OMM_NOTIFY_CHANNEL;
+  if (env.OMM_NOTIFY_MESSAGE) out.message = env.OMM_NOTIFY_MESSAGE;
+  if (env.OMM_NOTIFY_FILE) out.file = env.OMM_NOTIFY_FILE;
+  if (env.OMM_NOTIFY_ALLOW_EXTERNAL === "1") out.allowExternalFile = true;
+  else if (env.OMM_NOTIFY_ALLOW_EXTERNAL === "0") out.allowExternalFile = false;
+  const webhook = env.OMM_NOTIFY_WEBHOOK_URL ?? env.DISCORD_WEBHOOK_URL ?? env.SLACK_WEBHOOK_URL;
+  if (webhook) out.webhookUrl = webhook;
+  if (env.TELEGRAM_BOT_TOKEN) out.botToken = env.TELEGRAM_BOT_TOKEN;
+  if (env.TELEGRAM_CHAT_ID) out.chatId = env.TELEGRAM_CHAT_ID;
+  if (env.OMM_NOTIFY_INCLUDE_ASSISTANT === "1") out.includeAssistantMessage = true;
+  else if (env.OMM_NOTIFY_INCLUDE_ASSISTANT === "0") out.includeAssistantMessage = false;
+  return out;
+}
+
+/**
+ * Write the config file with mode 0600, creating the directory with
+ * 0700. Returns the config path. Never logs secrets (callers must not
+ * print the returned config values either).
+ */
+export function writeNotifyConfig(config, home = os.homedir()) {
+  const dir = notifyConfigDir(home);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.chmodSync(dir, 0o700);
+  const file = notifyConfigPath(home);
+  fs.writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+  return file;
+}
 
 export function expandEnvInString(str, env = process.env) {
   return String(str).replace(/\$(\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}|([A-Za-z_][A-Za-z0-9_]*))/g, (m, _g, braced, def, plain) => {
@@ -130,33 +194,16 @@ export function renderTemplate(template, vars) {
   });
 }
 
-function postJson(urlStr, payload, { timeoutMs = 8000 } = {}) {
-  const url = new URL(assertHttps(urlStr, "notify"));
-  const body = JSON.stringify(payload);
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: `${url.pathname}${url.search}`,
-        method: "POST",
-        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) },
-        timeout: timeoutMs,
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (c) => { data += c; });
-        res.on("end", () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) resolve({ ok: true, status: res.statusCode, body: data });
-          else reject(new Error(`Notify POST failed with status ${res.statusCode}: ${redactText(data.slice(0, 500))}`));
-        });
-      }
-    );
-    req.on("error", (err) => reject(new Error(`Notify POST failed: ${redactText(err.message)}`)));
-    req.on("timeout", () => req.destroy(new Error("Notify POST timed out")));
-    req.write(body);
-    req.end();
+async function postJson(urlStr, payload, { timeoutMs = 8000 } = {}) {
+  const url = assertHttps(urlStr, "notify");
+  const res = await globalThis.fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+  if (res.ok) return { ok: true, status: res.status, body: await res.text() };
+  throw new Error(`Notify POST failed with status ${res.status}: ${redactText((await res.text()).slice(0, 500))}`);
 }
 
 export async function sendTelegram({ botToken, chatId, text }) {
@@ -195,10 +242,11 @@ export function baseVars({ projectName, extra = {} } = {}) {
 
 /** Best-effort notification. Never throws past this point uncaught by the caller. */
 export async function sendNotification({ channel, message, projectName, vars = {}, hook = {}, root = process.cwd(), allowExternalFile = false }) {
-  if (!CHANNELS.includes(channel)) throw new Error(`Unknown channel "${channel}"; expected ${CHANNELS.join("|")}`);
+  const name = String(channel ?? "").toLowerCase();
+  if (!CHANNELS.includes(name)) throw new Error(`Unknown channel "${channel}"; expected ${CHANNELS.join("|")}`);
   const text = redactText(renderTemplate(expandEnvInString(String(message ?? hook.text ?? "")), baseVars({ projectName, extra: vars })));
   if (!text) throw new Error("Notification message is empty after template rendering");
-  switch (channel) {
+  switch (name) {
     case "telegram":
       return sendTelegram({ botToken: hook.botToken ?? process.env.TELEGRAM_BOT_TOKEN ?? "", chatId: hook.chatId ?? process.env.TELEGRAM_CHAT_ID ?? "", text });
     case "discord":
@@ -208,47 +256,85 @@ export async function sendNotification({ channel, message, projectName, vars = {
     case "file":
       return sendFile({ file: hook.file ?? process.env.OMM_NOTIFY_FILE ?? "omm-notify.log", text, root, allowExternalFile });
     default:
-      throw new Error(`Unhandled channel "${channel}"`);
+      throw new Error(`Unhandled channel "${name}"`);
   }
 }
 
-/** Read hook stdin leniently: empty, non-JSON, or unreadable input yields {}. */
+/**
+ * Read hook stdin tolerantly: any input that does not parse to a JSON
+ * object (empty, non-JSON, or unreadable) yields null, and the caller
+ * must exit 0 WITHOUT sending. Never throws.
+ */
 export function readHookPayload() {
   try {
-    if (process.stdin.isTTY) return {};
+    if (process.stdin.isTTY) return null;
     const raw = fs.readFileSync(0, "utf8");
-    if (!raw.trim()) return {};
+    if (!raw.trim()) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === "object" ? parsed : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-export function eventFromPayload(payload) {
-  const raw = payload?.event ?? payload?.hook_event ?? payload?.hookEvent ?? payload?.type ?? "";
-  if (EVENTS.includes(raw)) return raw;
-  return "Stop";
+/** Template vars for the Stop hook, from the payload's cwd (fallback: process.cwd()). */
+export function hookVarsFromPayload(payload, cwd) {
+  return {
+    projectName: path.basename(path.resolve(cwd)),
+    event: payload?.hook_event_name ?? payload?.event ?? payload?.hook_event ?? HOOK_EVENT,
+    date: new Date().toISOString(),
+    model: payload?.model ?? "",
+    sessionId: payload?.session_id ?? payload?.sessionId ?? "",
+  };
 }
 
-export async function runHook(defaultEvent = "Stop") {
-  const channel = String(process.env.OMM_NOTIFY_CHANNEL ?? "").toLowerCase();
+export async function runHook() {
+  const configPath = notifyConfigPath();
   try {
+    let stat;
+    try {
+      stat = fs.statSync(configPath);
+    } catch {
+      process.exit(0); // no config: silent no-op
+    }
+    if (!isSecureConfigMode(stat.mode)) {
+      console.error("notify config is group/other-readable; refusing to send");
+      process.exit(0);
+    }
+    const cfg = readNotifyConfigFile(configPath);
+    const channel = String(cfg.channel ?? "").toLowerCase();
     if (!channel || channel === "off" || channel === "none") process.exit(0);
+    if (!CHANNELS.includes(channel)) process.exit(0);
     const payload = readHookPayload();
-    const raw = payload?.event ?? payload?.hook_event ?? payload?.hookEvent ?? payload?.type ?? defaultEvent;
-    const event = EVENTS.includes(raw) ? raw : defaultEvent;
-    const message = process.env.OMM_NOTIFY_MESSAGE
-      ?? (event === "SessionEnd"
-        ? "oh-my-muse: session ended in {{projectName}} at {{date}}"
-        : "oh-my-muse: turn finished in {{projectName}} at {{date}}");
+    if (!payload) process.exit(0); // invalid stdin: exit 0 without sending
+    if (payload.stop_hook_active === true) process.exit(0);
+    // The hook reads ONLY the file: OMM_* and other env vars are ignored.
+    const cwd = typeof payload?.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+    const vars = hookVarsFromPayload(payload, cwd);
+    const template = cfg.message ?? "oh-my-muse: turn finished in {{projectName}} at {{date}}";
+    let text = redactText(renderTemplate(String(template), vars));
+    if (!text) process.exit(0);
+    if (cfg.includeAssistantMessage === true && typeof payload?.last_assistant_message === "string" && payload.last_assistant_message) {
+      text += `\n\n${redactText(payload.last_assistant_message.slice(0, 500))}`;
+    }
+    // Default every field to "" so sendNotification never falls back to
+    // process.env: the hook reads ONLY the file.
+    const hook = {
+      webhookUrl: cfg.webhookUrl ?? "",
+      url: cfg.webhookUrl ?? "",
+      botToken: cfg.botToken ?? "",
+      chatId: cfg.chatId ?? "",
+      file: cfg.file ?? "omm-notify.log",
+    };
+    const allowExternalFile = cfg.allowExternalFile === true;
     const result = await sendNotification({
       channel,
-      message,
-      hook: {},
-      root: process.cwd(),
-      allowExternalFile: process.env.OMM_NOTIFY_ALLOW_EXTERNAL === "1",
-      vars: { event },
+      message: text,
+      projectName: vars.projectName,
+      vars: {},
+      hook,
+      root: cwd,
+      allowExternalFile,
     });
     if (channel === "file") console.log(`Notified via file: ${result.file}`);
     else console.log(`Notified via ${channel}.`);
@@ -262,5 +348,5 @@ export async function runHook(defaultEvent = "Stop") {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
 
 if (isMain) {
-  await runHook("Stop");
+  await runHook();
 }

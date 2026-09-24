@@ -14,7 +14,9 @@ describe("npm tarball content", () => {
     assert.ok(has("plugin/.muse-plugin/plugin.json"), "tarball must contain plugin/.muse-plugin/plugin.json");
     assert.ok(has("plugin/skills/verify/SKILL.md"), "tarball must contain plugin skills");
     assert.ok(has("plugin/commands/omm-team.md"), "tarball must contain plugin commands");
-    assert.ok(has("plugin/hooks/notify-stop.mjs"), "tarball must contain plugin hooks");
+    assert.ok(has("plugin/hooks/notify.mjs"), "tarball must contain plugin hooks");
+    assert.ok(!files.some((f) => f.includes("notify-end.mjs")), "tarball must not contain notify-end.mjs");
+    assert.ok(!files.some((f) => f.includes("notify-stop.mjs")), "tarball must not contain notify-stop.mjs");
     assert.ok(has("bin/omm.mjs"), "tarball must contain bin/omm.mjs");
     assert.ok(!files.some((f) => f.includes("pack/agents/")), "tarball must not contain the removed pack/");
   });

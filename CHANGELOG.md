@@ -39,9 +39,22 @@ All notable changes to this project are documented here. Format follows
   `implementer`, `planner`, `refactorer`, `researcher`, `reviewer`,
   `security-reviewer`, `tester`, `harness`, `verify`, `docs`,
   `security`), 7 commands (`omm-team`, `omm-autopilot`, `omm-ultrawork`,
-  `omm-pipeline`, `omm-ultraqa`, `omm-ralph`, `omm-advisor`), and 2 hooks
-  (`omm-notify-stop` on `Stop`, `omm-notify-end` on `SessionEnd`) sharing
-  a self-contained `plugin/hooks/notify.mjs`.
+  `omm-pipeline`, `omm-ultraqa`, `omm-ralph`, `omm-advisor`), and 1 hook
+  (`omm-notify-stop` on `Stop`, self-contained `plugin/hooks/notify.mjs`).
+- Notify config file (Fase 5 hotfix, still unreleased): hooks never saw
+  `OMM_NOTIFY_CHANNEL` because Muse filters the hook environment, and
+  `Stop` fires at the end of every turn. The hook now reads only
+  `$HOME/.config/oh-my-muse/notify.json` (via `os.homedir()`; no
+  `XDG_CONFIG_HOME`): `channel`, `webhookUrl`, `botToken`, `chatId`,
+  `file`, `message`, `allowExternalFile`, `includeAssistantMessage`
+  (default false). `OMM_*` overrides the file for CLI use only.
+  Owner-only modes enforced (`0600` file / `0700` dir; the hook sends
+  nothing and `omm doctor` fails otherwise). `omm notify setup` writes
+  the file without ever printing secrets; `omm notify test` sends using
+  it; `omm doctor` reports path, mode, and channel. The `SessionEnd`
+  hook (`omm-notify-end`, `notify-end.mjs`) is removed; the single
+  `Stop` hook points directly at `hooks/notify.mjs`. `stop_hook_active`
+  payloads and non-object stdin are silent no-ops (always exit 0).
 - `docs/OPEN-QUESTIONS.md`: schema findings (no workflow-launch entry,
   full valid hook-event list, `duplicate-hook-source`).
 - Tests: real validators with `t.skip()` when `muse` is absent, kept

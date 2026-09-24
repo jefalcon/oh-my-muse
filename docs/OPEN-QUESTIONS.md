@@ -37,9 +37,15 @@ Rejected: `TurnEnd`, `SessionEndBlahBlah` (invented), any case variant
 (`SessionStart` also validates, but it is a start event, not an end event.)
 
 `Stop` (end of turn) and `SessionEnd` (end of session) both exist, so the
-notify hook is registered on both, sharing one `hooks/notify.mjs` source
-(one source file per hook ID is required; here each hook ID keeps its own
+notify hook was registered on both, sharing one `hooks/notify.mjs` source
+(one source file per hook ID is required; each hook ID kept its own
 argv entry pointing at the same file — see D3).
+
+Fase 5 update: a probe plugin showed `Stop` fires at the end of EVERY
+turn (also under `muse exec`) and the hook environment is filtered (no
+`OMM_*`, no `XDG_CONFIG_HOME` reach the hook). The `SessionEnd`
+registration is therefore removed: a single `omm-notify-stop` hook on
+`Stop` remains, reading only `$HOME/.config/oh-my-muse/notify.json`.
 
 ### D3 — Hook source sharing (Fase 3, decided 2026-09-24)
 
@@ -50,17 +56,34 @@ validator rejects a shared argv source (`duplicate-hook-source`, observed
 logic (exported `runHook`), and thin wrappers `hooks/notify-stop.mjs` /
 `hooks/notify-end.mjs` reference one argv path each. Validation is clean.
 
+Fase 5 update: with only one hook left there is no sharing anymore, so
+`omm-notify-stop` points directly at `hooks/notify.mjs` and both
+wrappers are deleted.
+
 ## Open
 
-### O1 — Hook stdin payload shape
+### O1 — Hook stdin payload shape (Fase 5: verified on this machine)
 
-No recon source documents the JSON payload a hook receives on stdin, nor
-the expected stdout/exit-code protocol beyond "structured argv, not a
-shell string". `plugin/hooks/notify.mjs` therefore reads stdin leniently
-(any JSON or empty), never fails the hook on malformed input (exits 0
-after logging redacted diagnostics to stderr), and caps its own runtime
-well under `timeoutMs`. `muse plugins hook test` could confirm the shape
-but requires an installed plugin, which is out of scope here.
+A probe `Stop` hook under `muse exec` received this environment (only):
+`HOME`, `LANG`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`,
+`MUSE_PLUGIN_ROOT`, `MUSE_PLUGIN_DATA_DIR`, `MUSE_PLUGIN_ID`,
+`PLUGIN_ROOT`, `PLUGIN_DATA`, `CLAUDE_PLUGIN_ROOT`,
+`CLAUDE_PLUGIN_DATA` — no `OMM_*`, no `XDG_CONFIG_HOME`. cwd is the
+workspace root and stdin JSON carries `cwd`, `hook_event_name`
+(`"Stop"`), `last_assistant_message`, `model`, `model_provider`,
+`permission_mode`, `session_id`, `stop_hook_active`, `transcript_path`,
+`turn_id`. `plugin/hooks/notify.mjs` parses that shape tolerantly
+(non-object input is a silent no-op), never fails the turn (always exit
+0 after redacted stderr diagnostics), and caps its own runtime well
+under `timeoutMs`.
+
+### O4 — Do webhooks leave the hook network sandbox?
+
+`telegram`/`discord`/`slack` delivery from inside a hook is untested
+end to end: pending verification whether the hook network sandbox lets
+those POSTs out. The `file` channel works without network. Verify with
+`omm notify setup --channel discord ...` + `omm notify test` (CLI, full
+env) versus a real `Stop` firing, comparing arrivals.
 
 ### O2 — Command frontmatter beyond `description`/`argument-hint`
 

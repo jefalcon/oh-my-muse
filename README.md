@@ -72,25 +72,48 @@ Skills (loaded by the model, `user-invocable: false`): `architect`,
 `reviewer`, `security-reviewer`, `tester`, plus `harness`, `verify`,
 `docs`, `security`.
 
-Notifications: the `omm-notify-stop` (`Stop`) and `omm-notify-end`
-(`SessionEnd`) hooks share the self-contained `plugin/hooks/notify.mjs`.
-They are silent unless `OMM_NOTIFY_CHANNEL` is set:
+Notifications: the single `omm-notify-stop` hook (`Stop`,
+`plugin/hooks/notify.mjs`, self-contained, node builtins only) reads
+**only** `$HOME/.config/oh-my-muse/notify.json` (`XDG_CONFIG_HOME` is
+NOT used). It is silent unless that file sets a channel:
 
 ```sh
-export OMM_NOTIFY_CHANNEL=file        # telegram|discord|slack|file
-export OMM_NOTIFY_FILE=omm-notify.log # confined to the session cwd
+omm notify setup --channel file --file omm-notify.log \
+  --message "turn done in {{projectName}}"
+omm notify test   # send one notification using the file
 ```
 
-Telegram needs `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`; Discord/Slack
-need `DISCORD_WEBHOOK_URL` / `SLACK_WEBHOOK_URL` (https + provider host
-allowlist enforced; secrets redacted from every diagnostic). On-demand:
+Message templates support `{{projectName}}` (session cwd basename),
+`{{event}}`, `{{date}}`, `{{model}}`, `{{sessionId}}`. With
+`includeAssistantMessage: true` the turn's last assistant message is
+appended (truncated to 500 chars, redacted).
+
+Two warnings, both verified on this machine:
+
+- Muse **filters the hook environment**: only `HOME`, `LANG`, `PATH`,
+  etc. reach the hook — no `OMM_*`, no `XDG_CONFIG_HOME`. That is why
+  secrets live in the file, never in env. For CLI use (`omm notify`)
+  `OMM_*` variables still override the file.
+- `Stop` fires at the end of **every turn** (also under `muse exec`),
+  not once per session.
+
+The file must stay owner-only (mode `0600`, directory `0700`):
+`setup` writes it that way; a group/other-readable file makes the hook
+send nothing and `omm doctor` fail. Telegram needs `botToken` +
+`chatId`; Discord/Slack need `webhookUrl` (https + provider host
+allowlist enforced; secrets redacted from every diagnostic and never
+printed by `setup`/`doctor`). File-channel notes land inside the
+payload `cwd` unless `allowExternalFile` is set. On-demand, without a
+file:
 
 ```sh
 omm notify --channel file --message "deploy done" --file ./notify.log
 ```
 
-An explicit `--file` opts out of root confinement; env-driven paths stay
-confined unless `OMM_NOTIFY_ALLOW_EXTERNAL=1`.
+An explicit `--file` opts out of root confinement; file/env-driven
+paths stay confined unless `allowExternalFile` /
+`OMM_NOTIFY_ALLOW_EXTERNAL=1`. `omm doctor` reports the config file,
+its mode, and its channel (never secrets).
 
 ## Uninstall
 

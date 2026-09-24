@@ -26,6 +26,18 @@ function runCli(args, cwd, extraEnv = {}) {
   });
 }
 
+/**
+ * HOME isolated inside .scratch/ so a real
+ * ~/.config/oh-my-muse/notify.json on the dev machine cannot change
+ * notify CLI results.
+ */
+function isolatedHome() {
+  fs.mkdirSync(path.join(REPO_ROOT, ".scratch"), { recursive: true });
+  const home = fs.mkdtempSync(path.join(REPO_ROOT, ".scratch", "e2e-home-"));
+  tmpDirs.push(home);
+  return home;
+}
+
 function runCliFail(args, cwd, extraEnv = {}) {
   try {
     runCli(args, cwd, extraEnv);
@@ -70,13 +82,13 @@ describe("CLI surface", () => {
 
   it("notify sends to the file channel in the cwd", () => {
     const cwd = makeTmp();
-    const out = runCli(["notify", "--channel", "file", "--message", "deploy done", "--file", "n.log"], cwd);
+    const out = runCli(["notify", "--channel", "file", "--message", "deploy done", "--file", "n.log"], cwd, { HOME: isolatedHome() });
     assert.ok(out.includes("Notified via file"), out);
     assert.match(fs.readFileSync(path.join(cwd, "n.log"), "utf8"), /deploy done/);
   });
 
   it("notify requires a message", () => {
-    const res = runCliFail(["notify", "--channel", "file"], makeTmp());
+    const res = runCliFail(["notify", "--channel", "file"], makeTmp(), { HOME: isolatedHome() });
     assert.notEqual(res.status, 0);
     assert.ok(res.output.includes("--message"), res.output);
   });
@@ -85,6 +97,7 @@ describe("CLI surface", () => {
     const res = runCliFail(
       ["notify", "--channel", "discord", "--message", "hi", "--webhookUrl", "http://evil.example/x"],
       makeTmp(),
+      { HOME: isolatedHome() },
     );
     assert.notEqual(res.status, 0);
     assert.ok(!res.output.includes("http://evil.example/x"), "URL must not leak");
