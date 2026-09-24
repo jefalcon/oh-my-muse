@@ -21,7 +21,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "omm": "./bin/omm.mjs"
+    "omm": "bin/omm.mjs"
   },
   "files": [
     "bin/",
