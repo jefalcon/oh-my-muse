@@ -231,6 +231,39 @@ export function validatePlugin({ pluginDir, musePath } = {}) {
   return results;
 }
 
+/** Read the plugin manifest (plugin/.muse-plugin/plugin.json). Throws when missing/unparseable. */
+export function readManifest(pluginDir) {
+  const file = path.join(pluginDir, ".muse-plugin", "plugin.json");
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+/** Normalize capabilities.skills/commands/hooks to arrays (never null). */
+export function manifestCapabilities(manifest) {
+  const caps = manifest?.capabilities ?? {};
+  return {
+    skills: Array.isArray(caps.skills) ? caps.skills : [],
+    commands: Array.isArray(caps.commands) ? caps.commands : [],
+    hooks: Array.isArray(caps.hooks) ? caps.hooks : [],
+  };
+}
+
+/**
+ * Skill ids registered in Muse (`muse skills list --json`).
+ * Returns null when the list is unavailable (never throws): callers
+ * must treat null as "unknown", not as "none registered".
+ */
+export function listRegisteredSkillIds({ musePath } = {}) {
+  try {
+    const res = runMuse(["skills", "list", "--json"], { musePath });
+    if (res.status !== 0) return null;
+    const doc = JSON.parse(res.stdout);
+    const skills = Array.isArray(doc?.skills) ? doc.skills : [];
+    return skills.map((s) => String(s?.id ?? "")).filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
 export function installArgs(pluginDir, scope) {
   if (scope !== undefined && scope !== "user" && scope !== "project") {
     throw new Error(`--scope must be user|project, got "${scope}"`);

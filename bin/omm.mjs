@@ -8,6 +8,9 @@ import {
   runMuse,
   museVersion,
   validatePlugin,
+  readManifest,
+  manifestCapabilities,
+  listRegisteredSkillIds,
   installArgs,
   notifySetupHelp,
   redactText,
@@ -114,8 +117,30 @@ function cmdDoctor() {
       check(false, `muse --version failed: ${err.message}`);
     }
     try {
-      const results = validatePlugin({ pluginDir: PLUGIN_DIR, musePath });
-      check(true, `validators pass (${results.skills.length} skills + plugin)`);
+      validatePlugin({ pluginDir: PLUGIN_DIR, musePath });
+      // Counts come from the manifest, not from folder scans: a skill
+      // on disk but missing from capabilities.skills is never loaded
+      // (0.2.1 bug: omm-narration existed but was not registered).
+      const caps = manifestCapabilities(readManifest(PLUGIN_DIR));
+      const plural = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
+      check(true, `validators pass (manifest: ${plural(caps.skills.length, "skill")} + ${plural(caps.commands.length, "command")} + ${plural(caps.hooks.length, "hook")})`);
+      // Declared-vs-registered comparison. Warning only, never a
+      // failure: on a fresh checkout the plugin is simply not installed.
+      const registered = listRegisteredSkillIds({ musePath });
+      if (registered === null) {
+        console.log("WARN  could not list registered skills (muse skills list failed)");
+      } else {
+        const prefix = `plugin:${PLUGIN_ID}:`;
+        const ours = new Set(
+          registered.filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length)),
+        );
+        const missing = caps.skills.map((s) => s.id).filter((id) => !ours.has(id));
+        if (missing.length === 0) {
+          check(true, `skills registered in muse (${ours.size}/${caps.skills.length})`);
+        } else {
+          console.log(`WARN  skills declared but not registered in muse: ${missing.join(", ")} (is the plugin installed and approved?)`);
+        }
+      }
     } catch (err) {
       check(false, `validation: ${err.message}`);
     }
