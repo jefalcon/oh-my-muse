@@ -47,7 +47,7 @@ Commands:
   notify --channel <c> --message <m>
                                   Send a notification (telegram|discord|slack|file)
   guard on|off|status             Enable/disable the narration guardian
-                                  (writes $HOME/.config/oh-my-muse/guard.json, mode 0600; on by default)
+                                  (writes $HOME/.config/oh-my-muse/guard.json, mode 0600; off by default: experimental)
 
 Config file ($HOME/.config/oh-my-muse/notify.json; XDG_CONFIG_HOME is NOT
 used): channel, webhookUrl, botToken, chatId, file, message,

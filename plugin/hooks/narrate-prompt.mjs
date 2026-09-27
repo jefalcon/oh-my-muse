@@ -2,8 +2,10 @@
  * omm-narrate-prompt (UserPromptSubmit): arm/disarm the narration guardian.
  *
  * - Prompt contains an omm command (`/omm-<name>`) → session active.
- * - Any other prompt → session inactive (the user moved on; mid-run
- *   reactivations carry no UserPromptSubmit, so they never disarm).
+ * - Any other prompt → no change. Subagent prompts ("Primero llama a
+ *   read_skill plugin:oh-my-muse:<rol>…") arrive here with the parent's
+ *   session_id, so disarming on them switched the guardian off mid-run.
+ *   The session disarms only on ✅ Hecho (Stop hook) or the block cap.
  *
  * Silent in every case (exit 0, no stdout): this hook never blocks.
  */
@@ -12,7 +14,6 @@ import {
   OMM_COMMAND,
   isGuardEnabled,
   readHookPayload,
-  readNarrateState,
   writeNarrateState,
 } from "./narrate-state.mjs";
 
@@ -29,8 +30,6 @@ export function runPromptHook() {
     if (typeof sessionId !== "string" || !sessionId) return 0;
     if (shouldActivate(payload.prompt)) {
       writeNarrateState(sessionId, { active: true, blocks: 0 });
-    } else if (readNarrateState(sessionId).active) {
-      writeNarrateState(sessionId, { active: false, blocks: 0 });
     }
   } catch {
     // Never fail the turn on our own failure.

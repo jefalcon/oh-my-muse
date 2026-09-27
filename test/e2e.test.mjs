@@ -63,7 +63,10 @@ afterEach(() => {
 
 /** PATH with node but without muse, for no-muse error paths. */
 function pathWithoutMuse() {
-  return path.dirname(process.execPath);
+  // node and muse may share a bin dir (e.g. ~/.local/bin): expose node alone.
+  const dir = makeTmp();
+  fs.symlinkSync(process.execPath, path.join(dir, "node"));
+  return dir;
 }
 
 describe("CLI surface", () => {

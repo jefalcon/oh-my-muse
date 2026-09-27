@@ -8,8 +8,8 @@
  * writing text. So narration is enforced mechanically:
  *
  * - `narrate-prompt.mjs` (UserPromptSubmit) marks the session active when
- *   the user prompt contains an omm command (`/omm-<name>`), inactive
- *   otherwise.
+ *   the prompt contains an omm command (`/omm-<name>`). It never disarms:
+ *   subagent prompts reach this hook with the parent's session_id.
  * - `narrate-stop.mjs` (Stop) blocks the turn end — forcing the model to
  *   write text instead — unless the last assistant message already carries
  *   the omm-narration card for that turn.
@@ -18,10 +18,16 @@
  * validator rejects two hooks sharing one argv source): each hook keeps
  * its own entry file and imports this one.
  *
+ * Off by default since 0.2.2: a real /omm-team run (2026-09-27) showed
+ * that a Stop block issued while a background workflow is pending ends the
+ * run without any model call, so the guardian never produced a card. The
+ * wave header now travels in the workflow name (see omm-narration). Opt in
+ * with `omm guard on` for experiments.
+ *
  * State: one JSON file per session_id under MUSE_PLUGIN_DATA_DIR (fallback
  * ~/.local/state/oh-my-muse), written atomically (tmp + rename), pruned
- * past 7 days. Kill switch: ~/.config/oh-my-muse/guard.json
- * ({enabled: false} disables both hooks); missing file means enabled.
+ * past 7 days. Switch: ~/.config/oh-my-muse/guard.json ({enabled: true}
+ * enables both hooks); missing or malformed file means disabled.
  *
  * Budgets: sync node builtins only, no network, no user files, well under
  * 100 ms. Every failure mode (bad stdin, missing session, fs error) is a
@@ -49,26 +55,25 @@ export function guardConfigPath(home = os.homedir()) {
   return path.join(home, ".config", "oh-my-muse", "guard.json");
 }
 
-/** True unless guard.json explicitly says {enabled: false}. Never throws. */
+/** True only when guard.json explicitly says {enabled: true}. Never throws. */
 export function isGuardEnabled(home = os.homedir()) {
   try {
     const parsed = JSON.parse(fs.readFileSync(guardConfigPath(home), "utf8"));
-    if (parsed && typeof parsed === "object" && parsed.enabled === false) return false;
-    return true;
+    return Boolean(parsed && typeof parsed === "object" && parsed.enabled === true);
   } catch {
-    return true; // missing or malformed file: enabled by default
+    return false; // missing or malformed file: disabled by default
   }
 }
 
 /**
  * Write the guard switch with mode 0600 (dir 0700). Returns the path.
- * `enabled` is coerced: only an explicit false disables the guardian.
+ * `enabled` is coerced: only an explicit true enables the guardian.
  */
 export function writeGuardConfig(enabled, home = os.homedir()) {
   const file = guardConfigPath(home);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.chmodSync(path.dirname(file), 0o700);
-  fs.writeFileSync(file, `${JSON.stringify({ enabled: enabled !== false }, null, 2)}\n`, { mode: 0o600 });
+  fs.writeFileSync(file, `${JSON.stringify({ enabled: enabled === true }, null, 2)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
   return file;
 }

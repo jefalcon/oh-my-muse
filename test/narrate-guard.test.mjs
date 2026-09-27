@@ -9,6 +9,7 @@ import {
   guardConfigPath,
   isGuardEnabled,
   narrateStateDir,
+  writeGuardConfig,
 } from "../plugin/hooks/narrate-state.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -21,10 +22,17 @@ const OMM_CLI = path.join(REPO_ROOT, "bin", "omm.mjs");
 const SCRATCH = path.join(REPO_ROOT, ".scratch");
 let tmpDirs = [];
 
-function makeHome() {
+function makeBareHome() {
   fs.mkdirSync(SCRATCH, { recursive: true });
   const dir = fs.mkdtempSync(path.join(SCRATCH, "guard-home-"));
   tmpDirs.push(dir);
+  return dir;
+}
+
+/** HOME with the guardian switched on (it is off by default since 0.2.2). */
+function makeHome() {
+  const dir = makeBareHome();
+  writeGuardConfig(true, dir);
   return dir;
 }
 
@@ -95,15 +103,29 @@ describe("narrate-prompt hook", () => {
     );
   });
 
-  it("deactivates the session on any other prompt", () => {
+  it("keeps the session armed on subagent prompts (they share the parent session_id)", () => {
     const home = makeHome();
     const dataDir = makeDataDir();
     runHook(PROMPT_HOOK, { home, dataDir, stdin: promptPayload("s1", "/omm-ralph go") });
     assert.equal(readState(dataDir, "s1").active, true);
-    const res = runHook(PROMPT_HOOK, { home, dataDir, stdin: promptPayload("s1", "something else") });
+    for (const prompt of [
+      "Primero llama a read_skill plugin:oh-my-muse:researcher. Inspecciona index.html.",
+      "something else",
+    ]) {
+      const res = runHook(PROMPT_HOOK, { home, dataDir, stdin: promptPayload("s1", prompt) });
+      assert.equal(res.status, 0);
+      assert.equal(res.stdout, "");
+      assert.equal(readState(dataDir, "s1").active, true, prompt);
+    }
+  });
+
+  it("does nothing by default (no guard.json: guardian off)", () => {
+    const home = makeBareHome();
+    const dataDir = makeDataDir();
+    const res = runHook(PROMPT_HOOK, { home, dataDir, stdin: promptPayload("s1", "/omm-team go") });
     assert.equal(res.status, 0);
     assert.equal(res.stdout, "");
-    assert.equal(readState(dataDir, "s1").active, false);
+    assert.equal(fs.existsSync(stateFile(dataDir, "s1")), false);
   });
 
   it("writes no state for a non-omm prompt with no prior state", () => {
@@ -283,13 +305,15 @@ describe("guard state plumbing", () => {
     pruneNarrateStates(path.join(dataDir, "does-not-exist")); // must not throw
   });
 
-  it("guard.json defaults to on and refuses to parse as on", () => {
-    const home = makeHome();
+  it("guard.json defaults to off; only {enabled: true} turns it on", () => {
+    const home = makeBareHome();
     assert.equal(guardConfigPath(home), path.join(home, ".config", "oh-my-muse", "guard.json"));
-    assert.equal(isGuardEnabled(home), true, "missing file means enabled");
+    assert.equal(isGuardEnabled(home), false, "missing file means disabled");
     fs.mkdirSync(path.dirname(guardConfigPath(home)), { recursive: true });
     fs.writeFileSync(guardConfigPath(home), "{broken json");
-    assert.equal(isGuardEnabled(home), true, "malformed file means enabled");
+    assert.equal(isGuardEnabled(home), false, "malformed file means disabled");
+    fs.writeFileSync(guardConfigPath(home), '{"enabled": true}');
+    assert.equal(isGuardEnabled(home), true);
   });
 });
 
@@ -302,8 +326,8 @@ describe("omm guard CLI", () => {
   }
 
   it("on/off write guard.json 0600 and status reports the switch", () => {
-    const home = makeHome();
-    assert.match(runGuard(home, "status"), /on/, "fresh HOME defaults to on");
+    const home = makeBareHome();
+    assert.match(runGuard(home, "status"), /: off/, "fresh HOME defaults to off");
     assert.match(runGuard(home, "off"), /off/);
     assert.equal(fs.statSync(guardConfigPath(home)).mode & 0o777, 0o600);
     assert.equal(JSON.parse(fs.readFileSync(guardConfigPath(home), "utf8")).enabled, false);
@@ -330,15 +354,14 @@ const museAvailable = (() => {
 })();
 
 describe("real hook round-trip", () => {
-  it("muse plugins hook test: Stop blocks without a card", (t) => {
+  it("muse plugins hook test: Stop follows the real guard switch", (t) => {
     if (!museAvailable) {
       t.skip("muse CLI not in PATH");
       return;
     }
-    if (!isGuardEnabled()) {
-      t.skip("narration guardian is off in the real HOME (omm guard off)");
-      return;
-    }
+    // Real HOME: the default (no guard.json) is off, so no block; with
+    // `omm guard on` the card-less Stop must block.
+    const expectBlock = isGuardEnabled();
     const runHookTest = (hookId, fixture) => {
       fs.mkdirSync(SCRATCH, { recursive: true });
       const file = path.join(SCRATCH, `hooktest-${hookId}-${process.pid}.json`);
@@ -399,7 +422,8 @@ describe("real hook round-trip", () => {
       t.skip("oh-my-muse is not installed in muse (install is out of scope for tests)");
       return;
     }
-    assert.equal(stop.doc?.should_block, true, `expected should_block true, got: ${stop.out.slice(0, 500)}`);
-    assert.ok(String(stop.doc?.block_reason ?? stop.out).length > 0, "block_reason must be set");
+    const decision = stop.doc?.decision ?? {};
+    assert.equal(decision.should_block, expectBlock, `expected should_block ${expectBlock}, got: ${stop.out.slice(0, 500)}`);
+    if (expectBlock) assert.match(String(decision.block_reason), /omm-narration/);
   });
 });
