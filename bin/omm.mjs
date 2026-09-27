@@ -25,6 +25,11 @@ import {
   writeNotifyConfig,
   isSecureConfigMode,
 } from "../plugin/hooks/notify.mjs";
+import {
+  guardConfigPath,
+  isGuardEnabled,
+  writeGuardConfig,
+} from "../plugin/hooks/narrate-state.mjs";
 
 const PLUGIN_DIR = pluginDirFromHere(import.meta.url);
 
@@ -41,6 +46,8 @@ Commands:
   notify test [--message <m>]     Send a notification using the config file
   notify --channel <c> --message <m>
                                   Send a notification (telegram|discord|slack|file)
+  guard on|off|status             Enable/disable the narration guardian
+                                  (writes $HOME/.config/oh-my-muse/guard.json, mode 0600; on by default)
 
 Config file ($HOME/.config/oh-my-muse/notify.json; XDG_CONFIG_HOME is NOT
 used): channel, webhookUrl, botToken, chatId, file, message,
@@ -271,6 +278,21 @@ async function cmdNotify(args) {
   else console.log(`Notified via ${channel}.`);
 }
 
+function cmdGuard(args) {
+  const sub = String(args._[1] ?? "status").toLowerCase();
+  if (sub === "on") {
+    const file = writeGuardConfig(true);
+    console.log(`Narration guardian: on (wrote ${file}, mode 600).`);
+  } else if (sub === "off") {
+    const file = writeGuardConfig(false);
+    console.log(`Narration guardian: off (wrote ${file}, mode 600).`);
+  } else if (sub === "status") {
+    console.log(`Narration guardian: ${isGuardEnabled() ? "on" : "off"} (${guardConfigPath()}).`);
+  } else {
+    fail(`Usage: omm guard on|off|status (got "${args._[1]}")`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const cmd = args._[0];
@@ -285,6 +307,7 @@ async function main() {
       case "validate": cmdValidate(); break;
       case "doctor": cmdDoctor(); break;
       case "notify": await cmdNotify(args); break;
+      case "guard": cmdGuard(args); break;
       default: fail(`Unknown command "${cmd}". Run: omm help`);
     }
   } catch (err) {

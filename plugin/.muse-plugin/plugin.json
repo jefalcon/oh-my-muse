@@ -153,6 +153,26 @@
         ],
         "timeoutMs": 15000,
         "statusMessage": "Sending turn-end notification"
+      },
+      {
+        "id": "omm-narrate-prompt",
+        "event": "UserPromptSubmit",
+        "command": [
+          "node",
+          "hooks/narrate-prompt.mjs"
+        ],
+        "timeoutMs": 5000,
+        "statusMessage": "Tracking narration state"
+      },
+      {
+        "id": "omm-narrate-stop",
+        "event": "Stop",
+        "command": [
+          "node",
+          "hooks/narrate-stop.mjs"
+        ],
+        "timeoutMs": 5000,
+        "statusMessage": "Checking narration card"
       }
     ],
     "mcpServers": [],
