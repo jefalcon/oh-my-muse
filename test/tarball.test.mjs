@@ -15,6 +15,9 @@ describe("npm tarball content", () => {
     assert.ok(has("plugin/skills/verify/SKILL.md"), "tarball must contain plugin skills");
     assert.ok(has("plugin/commands/omm-team.md"), "tarball must contain plugin commands");
     assert.ok(has("plugin/hooks/notify.mjs"), "tarball must contain plugin hooks");
+    assert.ok(has("plugin/hooks/narrate-prompt.mjs"), "tarball must contain the narrate prompt hook");
+    assert.ok(has("plugin/hooks/narrate-stop.mjs"), "tarball must contain the narrate stop hook");
+    assert.ok(has("plugin/hooks/narrate-state.mjs"), "tarball must contain the narrate shared module");
     assert.ok(!files.some((f) => f.includes("notify-end.mjs")), "tarball must not contain notify-end.mjs");
     assert.ok(!files.some((f) => f.includes("notify-stop.mjs")), "tarball must not contain notify-stop.mjs");
     assert.ok(has("bin/omm.mjs"), "tarball must contain bin/omm.mjs");

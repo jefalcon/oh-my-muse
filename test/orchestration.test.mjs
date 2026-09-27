@@ -43,6 +43,18 @@ const NARRATION_MARKERS = [
   'w<N>-<rol>',
 ];
 
+// Guardian contract (0.2.2): every command carries the short guardian
+// paragraph (final turn message = narration card; the Stop hook reminds
+// the model when it forgets) and no leftover turn-close experiment rule.
+const GUARDIAN_MARKERS = [
+  "## Guardián de narración",
+  "tu mensaje final del turno es la tarjeta",
+  "guardián (hook Stop)",
+];
+const BANNED_MARKERS = [
+  "REGLA DE CIERRE DE TURNO",
+];
+
 // The four narration templates live in exactly one place.
 const TEMPLATE_MARKERS = [
   "## 🏮 OMM",
@@ -61,8 +73,11 @@ describe("orchestrator commands orchestrate for real", () => {
       const file = path.join(COMMANDS_DIR, name);
       assert.ok(fs.existsSync(file), `${name} must exist`);
       const body = fs.readFileSync(file, "utf8");
-      for (const marker of [...MARKERS, ...NARRATION_MARKERS]) {
+      for (const marker of [...MARKERS, ...NARRATION_MARKERS, ...GUARDIAN_MARKERS]) {
         assert.ok(body.includes(marker), `${name} must contain: ${marker}`);
+      }
+      for (const banned of BANNED_MARKERS) {
+        assert.ok(!body.includes(banned), `${name} must not contain: ${banned}`);
       }
     });
   }

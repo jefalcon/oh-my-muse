@@ -67,9 +67,9 @@ function pathWithoutMuse() {
 }
 
 describe("CLI surface", () => {
-  it("help lists the five commands", () => {
+  it("help lists the six commands", () => {
     const out = runCli(["help"], makeTmp());
-    for (const cmd of ["install", "uninstall", "validate", "doctor", "notify"]) {
+    for (const cmd of ["install", "uninstall", "validate", "doctor", "notify", "guard"]) {
       assert.ok(out.includes(cmd), `help must mention ${cmd}`);
     }
   });
