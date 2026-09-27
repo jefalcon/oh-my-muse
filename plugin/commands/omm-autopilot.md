@@ -35,6 +35,11 @@ fin: $ARGUMENTS
    narración va en el hilo principal: el resultado del Workflow es
    para el padre, el usuario ve la tarjeta.
 
+## Guardián de narración
+
+Tras lanzar cada oleada, tu mensaje final del turno es la tarjeta de
+omm-narration. Un guardián (hook Stop) te lo recordará si la olvidas.
+
 ## Contrato de progreso (visible para el usuario)
 
 - Antes de lanzar: publica el plan con las oleadas, los roles de cada
