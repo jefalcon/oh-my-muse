@@ -79,6 +79,36 @@ Whether the TUI renders them was not verifiable from this session —
 the guaranteed-visible narration is the parent's cards (skill
 `omm-narration`), never the run name.
 
+## Decided (0.2.2)
+
+### D7 — Narration must be enforced by a Stop hook (decided 2026-09-27)
+
+Verified with real probes: the model does not narrate between waves
+even when ordered to. The tool is called `workflow`, runs in the
+background, and every launch ends the parent's turn (a `Stop` event
+right after). The parent wakes up with the results — no
+`UserPromptSubmit` — and launches the next wave without writing text.
+With the skill registered, only the final message of the whole run
+followed the template (`✔ Oleada 4/4` + `✅ Hecho`). Neither "write
+before calling" nor "write when closing the turn" worked, so 0.2.1's
+planned `PostToolUse` enforcement was dropped in favour of a blocking
+`Stop` hook (`omm-narrate-stop`), armed per session by
+`omm-narrate-prompt` on `UserPromptSubmit`.
+
+### D8 — Blocking a Stop: `decision:block` on stdout (decided 2026-09-27)
+
+`muse plugins hook test` confirms: stdout
+`{"decision":"block","reason":"…"}` with exit 0 yields `should_block:
+true` with `block_reason` set; exit 2 with the reason on stderr works
+too. `hookSpecificOutput` carrying `decision` errors on `Stop`: never
+use it there. The guardian uses the stdout form with exit 0.
+
+### D9 — `additionalContext` does not surface (decided 2026-09-27)
+
+`additionalContext` on `PostToolUse` fills `additional_contexts` in
+`hook test`, but in a real run the mark appeared in no session log.
+Nothing depends on it; the guardian returns no context additions.
+
 ## Open
 
 ### O6 — Revalidación en Muse Code 1.4.0 (verificado 2026-09-27)
@@ -115,6 +145,15 @@ workspace root and stdin JSON carries `cwd`, `hook_event_name`
 (non-object input is a silent no-op), never fails the turn (always exit
 0 after redacted stderr diagnostics), and caps its own runtime well
 under `timeoutMs`.
+
+2026-09-27 re-verification (0.2.2): the `Stop` payload carries `cwd`,
+`hook_event_name`, `last_assistant_message`, `model`,
+`model_provider`, `permission_mode`, `session_id`,
+`stop_hook_active`, `turn_id`; the `UserPromptSubmit` payload carries
+`cwd`, `hook_event_name`, `model`, `model_provider`,
+`permission_mode`, `prompt`, `session_id`, `transcript_path`. The
+narrate hooks parse both shapes tolerantly with the same
+never-fail-the-turn policy.
 
 ### O4 — Do webhooks leave the hook network sandbox? (Resolved 2026-09-24)
 

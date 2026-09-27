@@ -72,3 +72,23 @@ aunque el trabajo saliera bien.
 - [ ] **Nunca en pantalla**: JSON en bruto de resultados de Workflow,
   ni workflows llamados `generated.*` como única identificación (los
   hijos llevan `label: "w<N>-<rol>"`, p. ej. `w2-implementer`).
+
+## 6. Guardián de narración (desde 0.2.2)
+
+Si falta una tarjeta al cerrar un turno, el hook `omm-narrate-stop`
+bloquea el fin de turno con un recordatorio ("Guardián omm: escribe
+SOLO texto…") y el modelo escribe la tarjeta pendiente. Eso es el
+comportamiento esperado, no un fallo: marca igual el punto del
+checklist si la tarjeta aparece tras el recordatorio.
+
+Para comprobar la narración sin el guardián (p. ej. para medir si el
+modelo ya narra solo), desactívalo antes de lanzar y vuelve a
+activarlo después:
+
+```sh
+omm guard off   # el humo sale sin bloqueos
+/omm-team <tarea>
+omm guard on    # restaura el comportamiento por defecto
+```
+
+`omm guard status` muestra el interruptor actual.

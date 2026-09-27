@@ -3,6 +3,43 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.2] - 2026-09-27
+
+### Fixed
+
+- `omm-narration` is now declared in `capabilities.skills`: in 0.2.1 the
+  skill file existed but was missing from the manifest, so Muse never
+  loaded it (and `omm doctor` still counted the folder). A bidirectional
+  manifest test (`test/manifest.test.mjs`) now fails if any skill,
+  command, or hook on disk is undeclared, or any declaration points at a
+  missing file.
+
+### Added
+
+- Narration guardian: two hooks enforce the wave cards mechanically.
+  `omm-narrate-prompt` (`UserPromptSubmit`) arms the session when the
+  prompt contains `/omm-<command>`; `omm-narrate-stop` (`Stop`) blocks
+  the turn end until the last assistant message carries the
+  omm-narration card (🏮 / ✔ Oleada / ▶ Oleada), disarms on ✅ Hecho,
+  and never blocks past 12 times per session. Instructions alone were
+  proven insufficient: every `workflow` launch ends the parent's turn
+  and the parent relaunches without writing text.
+- `omm guard on|off|status`: kill switch for the guardian
+  (`$HOME/.config/oh-my-muse/guard.json`, mode 0600, on by default).
+- `omm doctor` now counts from the manifest instead of folders and warns
+  when a declared skill is not registered in
+  `muse skills list --json` (warning only: a fresh checkout simply has
+  no installed plugin).
+- The 7 commands carry a short guardian paragraph instead of the
+  turn-close experiment rule.
+
+### Known issues
+
+- The guardian matches cards by marker (🏮, `✔ Oleada`, `▶ Oleada`,
+  `✅ Hecho`): a card written with different wording is blocked and
+  reminded, up to the 12-block session cap, after which the turn ends
+  normally.
+
 ## [0.2.1] - 2026-09-24
 
 ### Fixed

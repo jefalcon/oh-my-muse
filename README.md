@@ -6,8 +6,9 @@
 [![ESM](https://img.shields.io/badge/modules-ESM-yellow)](package.json)
 
 Native [Muse Code](https://github.com/anthropics/muse-code) plugin:
-18 specialist skills, 7 orchestrator commands, and turn/session-end
-notifications. No tiers, no presets, no model routing — the model is chosen
+19 specialist skills, 7 orchestrator commands, turn/session-end
+notifications, and a narration guardian that enforces the wave cards.
+No tiers, no presets, no model routing — the model is chosen
 per session (see below).
 
 ## Install
@@ -70,9 +71,23 @@ Skills (loaded by the model, `user-invocable: false`): `architect`,
 `critic`, `data-scientist`, `debugger`, `designer`, `docs-writer`,
 `file-picker`, `implementer`, `planner`, `refactorer`, `researcher`,
 `reviewer`, `security-reviewer`, `tester`, plus `harness`, `verify`,
-`docs`, `security`.
+`docs`, `security`, and `omm-narration` (the wave-card templates).
 
-Notifications: the single `omm-notify-stop` hook (`Stop`,
+Narration guardian: two hooks (`omm-narrate-prompt` on
+`UserPromptSubmit`, `omm-narrate-stop` on `Stop`,
+`plugin/hooks/narrate-*.mjs`, node builtins only, no network) enforce
+the cards mechanically — every `workflow` launch ends the parent's
+turn, so orders alone never produced narration between waves. When a
+turn ends without its card, the Stop hook blocks with a reminder to
+write text only. Per-session state lives in `MUSE_PLUGIN_DATA_DIR`
+(fallback `~/.local/state/oh-my-muse`), one file per session, pruned
+past 7 days. To disable:
+
+```sh
+omm guard off     # on by default; status shows the switch
+```
+
+Notifications: the `omm-notify-stop` hook (`Stop`,
 `plugin/hooks/notify.mjs`, self-contained, node builtins only) reads
 **only** `$HOME/.config/oh-my-muse/notify.json` (`XDG_CONFIG_HOME` is
 NOT used). It is silent unless that file sets a channel:
