@@ -138,7 +138,13 @@ script or scriptPath is present, name is display-only". The
 writer` were accepted verbatim (`entry_id`); `script_id` becomes a
 sanitized `generated.workflow.__Oleada_1_2___prueba___researcher`.
 The TUI shows the name at launch and on completion, so the wave header
-lives there (all 7 commands, `omm-narration`).
+lives there (all 7 commands, `omm-narration`). Confirmed in a real
+headless `/omm-team` run (session `01a0e4d4`, 4 waves, about 6 min):
+the model named every wave `▶ Oleada N/4 · <nombre> · <rol>`, the log
+records it as `entryId`, `display_label` and "Launched ▶ Oleada …", and
+the final message carried the four wave cards plus `✅ Hecho` with a
+real `git diff --stat` and literal test output (89/89). The opening
+`🏮 OMM` card was not written.
 
 ### D12 — `muse exec` does not expand plugin slash commands (decided 2026-09-27)
 

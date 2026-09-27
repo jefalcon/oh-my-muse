@@ -54,6 +54,9 @@ All notable changes to this project are documented here. Format follows
 - The model still writes no text between waves. The per-wave progress
   the user sees during the run is the Workflow name. The full wave
   cards only appear in the final message.
+- The opening `🏮 OMM` card before the first wave was not written in
+  the verification run: the plan only shows up in the Workflow names
+  and in the final message.
 - `muse exec "/omm-team …"` does not expand plugin slash commands: the
   model receives the literal text and works in the main thread. Use the
   TUI, or pass the command body yourself.
