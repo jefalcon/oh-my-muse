@@ -81,6 +81,15 @@ the guaranteed-visible narration is the parent's cards (skill
 
 ## Open
 
+### O6 — Revalidación en Muse Code 1.4.0 (verificado 2026-09-27)
+
+Revalidados los 19 skills (`muse skills validate --json`) y el plugin
+(`muse plugins validate plugin --json`) con Muse Code 1.4.0:
+`valid:true`, cero diagnósticos en todos. Sin cambios respecto a
+1.3.0 en el comportamiento de los validadores ni en el formato de
+`muse skills list --json` (`{skills: [{id, ...}]}`, ids
+`plugin:oh-my-muse:*` cuando el plugin está instalado).
+
 ### O5 — Is `log()` visible in the TUI or /workflows? (unverified)
 
 `bundled:workflow-authoring` documents the bare global `log("message")`
