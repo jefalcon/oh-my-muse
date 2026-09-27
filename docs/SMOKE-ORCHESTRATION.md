@@ -60,12 +60,14 @@ aunque el trabajo saliera bien.
 - [ ] **Arranque**: una tarjeta `## 🏮 OMM <comando> · <objetivo>` con
   una frase de enfoque y una tabla de plan (Oleada | Roles | Paralelo
   | Gate) ANTES del primer Workflow.
-- [ ] **Antes de cada oleada**: cabecera `### ▶ Oleada N/M · <nombre>`
-  con una línea del porqué y el roster (`• <rol> → <encargo>`).
-- [ ] **Tras cada oleada**: tarjeta `### ✔` (o `⚠` / `✖`) con tabla
-  Rol | Resultado | Archivos | Pendiente, más las líneas `**Gate:**`
-  y `**Siguiente:**`. PROHIBIDO ver dos Workflows seguidos sin esta
-  tarjeta y la cabecera `▶` siguiente en medio.
+- [ ] **Cada oleada**: la TUI muestra el Workflow con su cabecera como
+  nombre, `Workflow(▶ Oleada N/M · <nombre> · <roles>)` al lanzar y
+  `Workflow ▶ Oleada N/M · … — completed · n/n` al terminar. Un slug
+  (`omm-oleada-2-…`) o `generated.*` cuenta como fallo.
+- [ ] **Tarjetas de oleada**: en el mensaje final, una tarjeta `### ✔`
+  (o `⚠` / `✖`) por oleada con tabla Rol | Resultado | Archivos |
+  Pendiente, más `**Gate:**` y `**Siguiente:**`. Entre oleadas el
+  modelo no escribe texto (limitación conocida de 0.2.2).
 - [ ] **Cierre**: tarjeta `## ✅ Hecho` con tabla de oleadas, un
   `git diff --stat` real, el resultado literal de los tests,
   pendientes y siguiente paso sugerido.
@@ -73,22 +75,27 @@ aunque el trabajo saliera bien.
   ni workflows llamados `generated.*` como única identificación (los
   hijos llevan `label: "w<N>-<rol>"`, p. ej. `w2-implementer`).
 
-## 6. Guardián de narración (desde 0.2.2)
+## 6. Guardián de narración (experimental, apagado por defecto)
 
-Si falta una tarjeta al cerrar un turno, el hook `omm-narrate-stop`
-bloquea el fin de turno con un recordatorio ("Guardián omm: escribe
-SOLO texto…") y el modelo escribe la tarjeta pendiente. Eso es el
-comportamiento esperado, no un fallo: marca igual el punto del
-checklist si la tarjeta aparece tras el recordatorio.
-
-Para comprobar la narración sin el guardián (p. ej. para medir si el
-modelo ya narra solo), desactívalo antes de lanzar y vuelve a
-activarlo después:
+Desde 0.2.2 el guardián (`omm-narrate-stop`) viene apagado. Los datos
+de una ejecución real (27-09-2026) muestran que, con un Workflow en
+segundo plano, un Stop bloqueado cierra el run sin llamar al modelo, así
+que el recordatorio nunca llega. Para experimentar con él:
 
 ```sh
-omm guard off   # el humo sale sin bloqueos
+omm guard on    # activa el bloqueo de fin de turno sin tarjeta
 /omm-team <tarea>
-omm guard on    # restaura el comportamiento por defecto
+omm guard off   # vuelve al valor por defecto
 ```
 
-`omm guard status` muestra el interruptor actual.
+`omm guard status` muestra el interruptor actual. En el log, un bloqueo
+aparece como `"effects":["blocked"]` en el `hook_run_terminal`.
+
+## 7. Headless (`muse exec`)
+
+`muse exec "/omm-team …"` no expande los commands de plugins: el modelo
+recibe el texto literal y trabaja en el hilo principal. Para una prueba
+headless, pasa el cuerpo del command con `$ARGUMENTS` sustituido
+(`--prompt-file`) y añade `--trust-workspace` para cargar `AGENTS.md`.
+Los nombres de los Workflows quedan en el log como `entry_id` del
+registro `workflow_run_launched`.

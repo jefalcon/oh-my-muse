@@ -7,7 +7,7 @@
 
 Native [Muse Code](https://github.com/anthropics/muse-code) plugin:
 19 specialist skills, 7 orchestrator commands, turn/session-end
-notifications, and a narration guardian that enforces the wave cards.
+notifications, and wave-by-wave progress in the Workflow names.
 No tiers, no presets, no model routing — the model is chosen
 per session (see below).
 
@@ -73,18 +73,25 @@ Skills (loaded by the model, `user-invocable: false`): `architect`,
 `reviewer`, `security-reviewer`, `tester`, plus `harness`, `verify`,
 `docs`, `security`, and `omm-narration` (the wave-card templates).
 
-Narration guardian: two hooks (`omm-narrate-prompt` on
-`UserPromptSubmit`, `omm-narrate-stop` on `Stop`,
-`plugin/hooks/narrate-*.mjs`, node builtins only, no network) enforce
-the cards mechanically — every `workflow` launch ends the parent's
-turn, so orders alone never produced narration between waves. When a
-turn ends without its card, the Stop hook blocks with a reminder to
-write text only. Per-session state lives in `MUSE_PLUGIN_DATA_DIR`
+Narration: during a run the model writes no text between waves, so
+the commands put the wave header in each Workflow's name, which the
+TUI shows at launch and on completion
+(`Workflow(▶ Oleada 2/4 · implementación · implementer)`). The full
+wave cards and `✅ Hecho` (real `git diff --stat` and literal test
+output) come in the final message.
+
+Experimental narration guardian (off by default): two hooks
+(`omm-narrate-prompt` on `UserPromptSubmit`, `omm-narrate-stop` on
+`Stop`, `plugin/hooks/narrate-*.mjs`, node builtins only, no network)
+that block a turn end without a card. In Muse 1.4.0 a Stop block
+issued while a Workflow runs in the background ends the run without a
+model call, so the guardian produced no cards and is kept only for
+experiments. Per-session state lives in `MUSE_PLUGIN_DATA_DIR`
 (fallback `~/.local/state/oh-my-muse`), one file per session, pruned
-past 7 days. To disable:
+past 7 days.
 
 ```sh
-omm guard off     # on by default; status shows the switch
+omm guard on      # off by default; status shows the switch
 ```
 
 Notifications: the `omm-notify-stop` hook (`Stop`,

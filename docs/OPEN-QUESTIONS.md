@@ -63,7 +63,7 @@ wrappers are deleted.
 
 ## Decided (0.2.1)
 
-### D4 — Readable workflow names: per-child only (decided 2026-09-24)
+### D4 — Readable workflow names: per-child only (decided 2026-09-24; superseded by D11)
 
 Regenerated `muse schema generate-ts --out .scratch/msp` on Muse Code
 1.3.0: `MspMethod` still carries only `workflow/cancel` and
@@ -81,7 +81,7 @@ the guaranteed-visible narration is the parent's cards (skill
 
 ## Decided (0.2.2)
 
-### D7 — Narration must be enforced by a Stop hook (decided 2026-09-27)
+### D7 — Narration must be enforced by a Stop hook (decided 2026-09-27; superseded by D10)
 
 Verified with real probes: the model does not narrate between waves
 even when ordered to. The tool is called `workflow`, runs in the
@@ -108,6 +108,47 @@ use it there. The guardian uses the stdout form with exit 0.
 `additionalContext` on `PostToolUse` fills `additional_contexts` in
 `hook test`, but in a real run the mark appeared in no session log.
 Nothing depends on it; the guardian returns no context additions.
+
+### D10 — A Stop block does not reactivate the model while a workflow runs (decided 2026-09-27)
+
+Session `01a0e4a9-6563-77c1-a979-219054750bd2` (two `/omm-team` runs,
+guardian on, 8 blocks). Every block follows the same pattern
+(analyzer lines 278, 400, 495, 588, 885, 1002, 1088, 1193):
+`workflow_run_launched` → `hook_run_terminal` (`omm-narrate-stop`,
+`status: blocked`, `effects: ["blocked"]`) → `completed` →
+`runtime.session/terminal` (`terminal: completed`, `reason: null`),
+all in the same `run_id` and within about 25 ms. No
+`model_request_configured` or `model_response_created` sits between
+the block and `terminal`, and the reason text ("Guardián omm: …")
+appears 0 times in the whole log, including later model inputs. The
+next model call is a new `run_id`, started by `inbox_item_queued`
+with `source: background_task_terminal` when the workflow ends. So the
+runtime does not honor the block while a background workflow is
+pending. The guardian is kept, off by default (`omm guard on`), for
+future Muse versions.
+
+### D11 — Workflow names are display-only and free text (decided 2026-09-27)
+
+The `workflow` tool's `name` is described as "Required short
+human-readable name, such as Summarize library functions … When
+script or scriptPath is present, name is display-only". The
+`^[a-z0-9][a-z0-9._-]{0,79}$` pattern applies only to saved workflows
+(`muse workflows save`). Probe session `01a0e4cf`: names
+`▶ Oleada 1/2 · prueba · researcher` and `▶ Oleada 2/2 · cierre ·
+writer` were accepted verbatim (`entry_id`); `script_id` becomes a
+sanitized `generated.workflow.__Oleada_1_2___prueba___researcher`.
+The TUI shows the name at launch and on completion, so the wave header
+lives there (all 7 commands, `omm-narration`).
+
+### D12 — `muse exec` does not expand plugin slash commands (decided 2026-09-27)
+
+`muse exec "/omm-team <task>"` sends the literal text: the model
+worked in the main thread (bash, read_file, search) with no
+`read_skill bundled:workflow-authoring` and no workflow. Headless
+smoke runs pass the command body with `$ARGUMENTS` substituted
+(`--prompt-file`) plus `--trust-workspace` (otherwise `AGENTS.md` is
+skipped). `muse exec` does wait for background workflows before it
+exits.
 
 ## Open
 

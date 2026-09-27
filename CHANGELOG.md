@@ -13,32 +13,50 @@ All notable changes to this project are documented here. Format follows
   manifest test (`test/manifest.test.mjs`) now fails if any skill,
   command, or hook on disk is undeclared, or any declaration points at a
   missing file.
+- The no-muse e2e tests no longer assume `node` and `muse` live in
+  different directories (they share `~/.local/bin` on some machines).
 
-### Added
+### Changed
 
-- Narration guardian: two hooks enforce the wave cards mechanically.
-  `omm-narrate-prompt` (`UserPromptSubmit`) arms the session when the
-  prompt contains `/omm-<command>`; `omm-narrate-stop` (`Stop`) blocks
-  the turn end until the last assistant message carries the
-  omm-narration card (🏮 / ✔ Oleada / ▶ Oleada), disarms on ✅ Hecho,
-  and never blocks past 12 times per session. Instructions alone were
-  proven insufficient: every `workflow` launch ends the parent's turn
-  and the parent relaunches without writing text.
-- `omm guard on|off|status`: kill switch for the guardian
-  (`$HOME/.config/oh-my-muse/guard.json`, mode 0600, on by default).
+- Wave headers now live in the Workflow name. The model writes no text
+  between waves, and the Muse TUI shows each Workflow's name at launch
+  and on completion. All 7 commands therefore require
+  `name = "▶ Oleada N/M · <nombre> · <roles>"`. Muse 1.4.0 accepts any
+  text as the name of a script workflow (it is display-only; the
+  `[a-z0-9._-]` pattern only applies to saved workflows).
+  `omm-narration` now puts the full wave cards (`✔`/`⚠`/`✖ Oleada
+  N/M` + table + gate) in the closing report, before `✅ Hecho`.
 - `omm doctor` now counts from the manifest instead of folders and warns
   when a declared skill is not registered in
   `muse skills list --json` (warning only: a fresh checkout simply has
   no installed plugin).
-- The 7 commands carry a short guardian paragraph instead of the
-  turn-close experiment rule.
+
+### Added
+
+- Experimental narration guardian, **off by default**:
+  `omm-narrate-prompt` (`UserPromptSubmit`) arms the session on
+  `/omm-<command>` and `omm-narrate-stop` (`Stop`) blocks a turn end
+  without a card (at most 12 blocks per session; `✅ Hecho` disarms it).
+  Turn it on with `omm guard on|off|status`
+  (`$HOME/.config/oh-my-muse/guard.json`, mode 0600). The prompt hook
+  never disarms: subagent prompts reach `UserPromptSubmit` with the
+  parent's `session_id`.
 
 ### Known issues
 
-- The guardian matches cards by marker (🏮, `✔ Oleada`, `▶ Oleada`,
-  `✅ Hecho`): a card written with different wording is blocked and
-  reminded, up to the 12-block session cap, after which the turn ends
-  normally.
+- The guardian is off because it does not work. In a real `/omm-team`
+  run on 2026-09-27 it blocked after every wave launch (4 of 4). Each
+  time the run went straight to `terminal` about 25 ms later, with no
+  model request, and the block reason appears nowhere in the session
+  log. The next model call only happens when the background workflow
+  finishes (`inbox_item_queued` / `background_task_terminal`), and by
+  then the block is forgotten. See `docs/OPEN-QUESTIONS.md` D10.
+- The model still writes no text between waves. The per-wave progress
+  the user sees during the run is the Workflow name. The full wave
+  cards only appear in the final message.
+- `muse exec "/omm-team …"` does not expand plugin slash commands: the
+  model receives the literal text and works in the main thread. Use the
+  TUI, or pass the command body yourself.
 
 ## [0.2.1] - 2026-09-24
 
