@@ -28,16 +28,26 @@ Ejecuta el trabajo con el máximo paralelismo: $ARGUMENTS
    todo). Un Workflow solo devuelve su resultado al terminar y el padre
    no puede narrar mientras se ejecuta; entre oleadas, narra el
    progreso.
-5. PROHIBIDO encadenar dos llamadas a Workflow sin haber escrito antes
-   la tarjeta de fin de oleada (`✔`/`⚠`/`✖` + `**Gate:**` +
-   `**Siguiente:**`) y la cabecera `▶` de la siguiente oleada. La
-   narración va en el hilo principal: el resultado del Workflow es
-   para el padre, el usuario ve la tarjeta.
+5. PROHIBIDO encadenar dos llamadas a Workflow sin que cada una lleve
+   como `name` su cabecera de oleada (ver abajo). Si escribes texto
+   entre oleadas, que sea la tarjeta de fin de oleada de
+   omm-narration; el resultado del Workflow es para el padre, el
+   usuario ve la cabecera y, al final, las tarjetas.
 
-## Guardián de narración
+## Nombre de cada Workflow (cabecera visible)
 
-Tras lanzar cada oleada, tu mensaje final del turno es la tarjeta de
-omm-narration. Un guardián (hook Stop) te lo recordará si la olvidas.
+Entre oleadas el usuario solo ve el nombre de cada Workflow, así que
+la cabecera de la oleada ES su `name`. Cada llamada a Workflow DEBE
+llevar `name` con exactamente esta forma:
+
+`▶ Oleada N/M · <nombre> · <roles>`
+
+p. ej. `▶ Oleada 2/4 · implementación · implementer, tester`. N empieza
+en 1, M es el total de oleadas del plan anunciado (si añades una
+oleada no prevista, como un reintento o otra vuelta de revisión, sube
+M en los nombres siguientes y dilo en el cierre). `<roles>` lista los
+roles de los hijos sin repetir. PROHIBIDO usar slugs
+(`omm-oleada-2-…`) como nombre.
 
 ## Contrato de progreso (visible para el usuario)
 
