@@ -1,5 +1,9 @@
 # oh-my-muse
 
+> **Archived.** This project is no longer maintained. A benchmark against
+> plain Muse Code found no evidence that omm adds value; see
+> [Benchmark: does omm add value over Muse Code?](#benchmark-does-omm-add-value-over-muse-code).
+
 [![CI](https://github.com/jefalcon/oh-my-muse/actions/workflows/ci.yml/badge.svg)](https://github.com/jefalcon/oh-my-muse/actions/workflows/ci.yml)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -152,6 +156,63 @@ npm test   # node --test test/ (validators skip cleanly when muse is absent)
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md),
 [docs/PARITY.md](docs/PARITY.md), [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md),
 and [SECURITY.md](SECURITY.md).
+
+## Benchmark: does omm add value over Muse Code?
+
+Small games were not enough to tell whether omm helps, so it was tested on
+a project of realistic complexity, to see whether its extra run time pays
+off in quality.
+
+Setup: a public website and management system for a fictitious psychology
+practice (Laravel + Filament, SQLite). The public side has a blog, health
+articles, services and a contact form that generates leads; the internal
+panel has clients, leads and lead conversion, clinical records with private
+attachments, 1:1 messaging and broadcast messages, and a calendar with
+appointment requests; plus a patient portal. Both runs got the same
+`SPEC.md`, on the same machine, with the same model, and a single attempt:
+no feedback and no fixes, and anything that does not work end to end
+counts as not delivered. The evaluation was blind (random codes) and done
+by Claude Code with Playwright against a checklist of 37 tests and 91
+points fixed in advance. The decision rule was also fixed before running:
+omm adds value if it beats Muse Code without the plugin by at least 10
+points and has no more security failures.
+
+|                                                        | Muse Code | Muse Code + omm      |
+| ------------------------------------------------------ | --------- | -------------------- |
+| Time                                                   | 44 min    | 47 min               |
+| Official score                                         | 39/91     | 0/91 (does not start) |
+| Same test suite, app served without `artisan serve` (unofficial) | 39/91 | 34/91      |
+| Flows that work, ignoring the external-resources rule  | 77/91     | 74/91                |
+| Own tests                                              | 43/43     | 35/35                |
+| Larastan level 5 errors                                | 25        | 26                   |
+
+The omm run does not start on the evaluation machine: `php artisan serve`
+drops the environment variables of the portable PHP install, so the server
+returns a fatal error on every page. The Muse Code run detected and worked
+around that problem; the omm run did not, even though it stated that it
+had verified startup from a clean clone.
+
+Both runs lose most of the admin and portal points for the same reason:
+Filament's default avatar is loaded from `ui-avatars.com`, and the spec
+forbade external resources. Both claimed "zero external requests".
+
+Failures specific to the Muse Code run: the client selector stores the
+wrong id, so clinical records, messages and appointments get assigned to
+another patient (the most serious defect of the two). Failures specific to
+the omm run: HTTP 500 when an attachment is requested without a session and
+when an appointment is requested from the portal, and notifications are
+not visible in the portal.
+
+Conclusion: in this benchmark omm was neither faster nor better. At best
+it comes close without surpassing it, at about 7 % more time, and its
+verification phase missed failures it reported as checked. Under the rule
+fixed in advance, omm does not add value.
+
+Limitations: this is a single pair of runs (the protocol planned three per
+side) and run-to-run variance is high, so the result does not show that
+omm is worse; only that there is no evidence it helps, and that it costs
+more. The spec, the checklist, the audit prompt and the reports are in
+[docs/benchmark/](docs/benchmark/) for anyone who wants to repeat it.
 
 ## Attribution
 
